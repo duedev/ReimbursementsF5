@@ -140,7 +140,7 @@ Settings → *paid accuracy tier*:
 
 | Provider | Default model | Cost | Notes |
 |---|---|---|---|
-| **OpenRouter** | `qwen/qwen2.5-vl-72b-instruct:free` | **Free** (`:free` models, rate-limited) | One OpenAI-compatible key; the same key also reaches paid Claude/Gemini. |
+| **OpenRouter** (default) | `openrouter/free` (Free Models Router) | **Free** (~50 req/day; 1000/day with ≥10 credits) | Auto-picks a quick, reliable free model that supports vision (`provider.sort: throughput`). One OpenAI-compatible key; type a paid Claude/Gemini id to use those instead. |
 | **Google Gemini** | `gemini-2.5-flash` | **Free tier** (no card) | Native vision + structured output. |
 | **Anthropic (Claude)** | `claude-haiku-4-5` | ~a fraction of a cent / receipt | Highest accuracy on hard/degraded receipts. |
 

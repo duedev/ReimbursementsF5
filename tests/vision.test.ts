@@ -4,6 +4,7 @@ import {
   visionToExtraction,
   parseVisionJson,
 } from "../src/pipeline/vision/schema.ts";
+import { usesFreeRouting } from "../src/pipeline/vision/providers/openrouter.ts";
 
 // Tier 3 (vision LLM) JSON → Extraction mapping. The network call is provider
 // code; this validates the normalization that every provider feeds into.
@@ -67,4 +68,11 @@ test("parseVisionJson tolerates code fences and surrounding prose", () => {
 
 test("parseVisionJson returns null on junk", () => {
   assert.equal(parseVisionJson("no json here"), null);
+});
+
+test("OpenRouter free routing is detected for the router and :free models", () => {
+  assert.equal(usesFreeRouting("openrouter/free"), true);
+  assert.equal(usesFreeRouting("qwen/qwen2.5-vl-72b-instruct:free"), true);
+  assert.equal(usesFreeRouting("anthropic/claude-haiku-4.5"), false);
+  assert.equal(usesFreeRouting("google/gemini-2.5-flash"), false);
 });

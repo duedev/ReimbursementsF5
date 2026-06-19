@@ -33,16 +33,15 @@ export interface ProviderMeta {
 export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
   openrouter: {
     id: "openrouter",
-    label: "OpenRouter",
-    defaultModel: "qwen/qwen2.5-vl-72b-instruct:free",
+    label: "OpenRouter (free router)",
+    defaultModel: "openrouter/free",
     free: true,
     keyUrl: "https://openrouter.ai/keys",
-    note: "One key, OpenAI-compatible. `:free` models cost $0 (rate-limited); the same key also reaches paid Claude/Gemini.",
+    note: "Free Models Router: auto-picks a quick, reliable free model that supports vision. $0 (≈50 requests/day free, 1000/day with ≥10 credits). The same key also reaches paid Claude/Gemini if you type their model id.",
     models: [
+      "openrouter/free",
       "qwen/qwen2.5-vl-72b-instruct:free",
-      "qwen/qwen2.5-vl-32b-instruct:free",
       "meta-llama/llama-3.2-11b-vision-instruct:free",
-      "mistralai/mistral-small-3.1-24b-instruct:free",
       "anthropic/claude-haiku-4.5",
       "google/gemini-2.5-flash",
     ],
