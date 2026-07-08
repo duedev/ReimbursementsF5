@@ -32,7 +32,7 @@ vite-plugin-pwa. Fonts self-hosted (@fontsource Inter + Fraunces).
 | `src/pipeline/perspective.ts` | opt-in OpenCV.js quad detect + warp (`VITE_PERSPECTIVE=1`, vendored lib) |
 | `src/pipeline/ocr.ts` | `OcrEngine` seam; Tesseract default; `VITE_OCR_ENGINE=paddle` → `engines/paddle/*` (ONNX det+rec+CTC) |
 | `src/config/vendors.ts` | Brand matcher: curated table + `src/data/vendorDb.extra.json` (generated, 329 brands); passes: exact → glyph-normalized (`normalizeGlyphs`) → bounded fuzzy (`fuzzyMatchVendor`); slogans as long aliases |
-| `src/pipeline/extract.ts` | Rules: grand-total tiers + reconcile, **pump-math reconcile** (gallons × price/gal corrects garbled fuel totals), US-first dates, tax, vendor line heuristic (greeting/address rejects) + fuzzy hook, confidence, flags; per-field `bbox` powers review markers/callouts |
+| `src/pipeline/extract.ts` | Rules: grand-total tiers + reconcile, **pump-math reconcile** (corroboration-gated: decimal-slip signature corrects, echoed/anchored totals are kept, moderate disagreement → keep + review), footing math with tip guard, US-first dates (stamp-glyph repair), tax, vendor line heuristic (greeting/address/pump-data rejects) + fuzzy hook, confidence, flags, `forcesManualReview()` (suspicious totals / `vendor_unclear` force human review); per-field `bbox` powers review markers/callouts |
 | `src/pipeline/logo/` | Visual logo layer: `embedder.ts` (CLIP seam, lazy, test-fakeable), `index.ts` (bundled `logoIndex.json` + user brands, cosine NN, header-band crop, `addBrandFromImage`), `fuse.ts` (Layer-3 fusion; `LOGO_ACCEPT`) — inert (no model download) while the index is empty |
 | `src/pipeline/vision/` | Opt-in AI assist (OpenRouter/Gemini/Anthropic), spend cap, build-time free key; signed-in users route via `supabase/aiProxy.ts` → `ai-extract` Edge Function |
 | `src/store/` | `db.ts` (IndexedDB v1: batches/receipts/jobs/blobs/brands/kv), `repo.ts` (the one read/write + notify seam), `sync.ts` (Supabase mirror: LWW on `updatedAt`, storage blobs, realtime) |
@@ -87,7 +87,22 @@ svelte-check) · `npm run build` · `npm run e2e` · `node tests/screenshots.mjs
   the JSON with `python3 scripts/export_vendor_db.py` (commit the result).
 - **Taxonomy: Fuel and Materials lead `CATEGORIES`, Other closes** — and the
   workbook renders Other as "Miscellaneous" (`displayCategory`). Hardware/
-  building brands map to Materials (the original's `mats`).
+  building brands map to Materials (the original's `mats`). The meals category
+  is named **"Meals"** (renamed from "Meals & Entertainment"); legacy stored
+  values are normalized on every `repo` read (`LEGACY_CATEGORIES`).
+- **Corrections never silently swap a plausible total.** Pump/footing math only
+  auto-corrects decimal-slip-scale garbles (ratio ≈ ×10/×100) or values the
+  receipt's own arithmetic contradicts; anything moderate keeps the printed
+  total and emits a warn-severity `total_mismatch`, which — like
+  `vendor_unclear` — forces `needs_review` via `extract.forcesManualReview()`.
+  Tips (TIP_RE) widen footing's expectations; per-gallon price lines are
+  excluded from reconcile's `allMax`.
+- **Workbook columns autofit** (`autofitColumns` in workbook.ts — ExcelJS has
+  none): merged band cells are skipped, notes wrap in a capped column
+  (`NOTES_WRAP_CHARS` drives row heights). Insights keeps FIXED widths — the
+  two-up chart grid anchors images at column offsets 0/6, so autofitting there
+  would overlap the charts. Chart text renders ~26px (titles 34px) because the
+  900px canvases embed at 0.62 scale (≈ 16px / 21px on-sheet).
 - **Receipts are renamed post-extraction** to `{cat}_{MM-DD-YY}_{vendor}.ext`
   (`util/rename.ts`, the original app's convention); the upload's name survives
   in `originalFileName` — the e2e keys receipts by it, not `fileName`.

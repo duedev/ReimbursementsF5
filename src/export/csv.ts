@@ -39,7 +39,8 @@ export function toCsv(receipts: Receipt[]): string {
   for (const r of rows) {
     lines.push(
       [
-        r.category.value,
+        // Report label parity with the workbook: Other reads Miscellaneous.
+        r.category.value === "Other" ? "Miscellaneous" : r.category.value,
         r.date.value,
         r.vendor.value,
         safeAmount(r.amount.value).toFixed(2),

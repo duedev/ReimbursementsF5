@@ -53,6 +53,11 @@ function dosDateTime(d: Date): { date: number; time: number } {
 
 /** Build a ZIP archive from the given entries. */
 export async function buildZip(entries: ZipEntry[]): Promise<Blob> {
+  // No ZIP64 support — fail loudly instead of silently emitting a corrupt
+  // archive past the classic format's limits.
+  if (entries.length > 0xffff) {
+    throw new Error(`Too many files for a ZIP archive (${entries.length} > 65535).`);
+  }
   const enc = new TextEncoder();
   const parts: Uint8Array[] = [];
   const central: Uint8Array[] = [];
@@ -101,6 +106,9 @@ export async function buildZip(entries: ZipEntry[]): Promise<Blob> {
   }
 
   const centralSize = central.reduce((s, p) => s + p.length, 0);
+  if (offset + centralSize + 22 > 0xffffffff) {
+    throw new Error("Archive exceeds the 4 GB ZIP limit.");
+  }
   const eocd = new DataView(new ArrayBuffer(22));
   eocd.setUint32(0, 0x06054b50, true);
   eocd.setUint16(8, entries.length, true);

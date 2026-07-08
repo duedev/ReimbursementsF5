@@ -63,16 +63,27 @@
     const r = $state.snapshot(receipt) as Receipt;
     const amt = parseAmount(amount);
     const tx = parseAmount(tax);
+    const newVendor = vendor.trim();
+    const newDate = date && isValidIso(date) ? date : r.date.value;
+    const newAmount = amt !== null ? safeAmount(amt) : r.amount.value;
+    // A hand-corrected value invalidates the baked highlighter copy — the
+    // marks would keep pointing at the OLD (wrong) tokens in every export.
+    // Drop it and fall back to the clean image.
+    const highlightsStale =
+      Boolean(r.annotatedKey) &&
+      (newVendor !== r.vendor.value ||
+        newDate !== r.date.value ||
+        newAmount !== r.amount.value);
     return {
-      vendor: { value: vendor.trim(), confidence: 1, edited: true, ...(r.vendor.bbox ? { bbox: r.vendor.bbox } : {}) },
+      vendor: { value: newVendor, confidence: 1, edited: true, ...(r.vendor.bbox ? { bbox: r.vendor.bbox } : {}) },
       date: {
-        value: date && isValidIso(date) ? date : r.date.value,
+        value: newDate,
         confidence: 1,
         edited: true,
         ...(r.date.bbox ? { bbox: r.date.bbox } : {}),
       },
       amount: {
-        value: amt !== null ? safeAmount(amt) : r.amount.value,
+        value: newAmount,
         confidence: 1,
         edited: true,
         ...(r.amount.bbox ? { bbox: r.amount.bbox } : {}),
@@ -80,21 +91,36 @@
       tax: { value: tx !== null ? safeAmount(tx) : r.tax.value, confidence: 1, edited: true },
       currency: currency.toUpperCase(),
       category: { value: category, confidence: 1, edited: true },
-      // Edits change the fields the file is named after — keep it in sync.
-      fileName: receiptFileName({
-        category,
-        date: date && isValidIso(date) ? date : r.date.value,
-        vendor: vendor.trim(),
-        fileName: r.originalFileName ?? r.fileName,
-      }),
+      // Edits change the fields the file is named after — keep it in sync
+      // (same amount>0 gate as the pipeline: failed reads keep their name).
+      ...(newAmount > 0
+        ? {
+            fileName: receiptFileName({
+              category,
+              date: newDate,
+              vendor: newVendor,
+              fileName: r.originalFileName ?? r.fileName,
+            }),
+          }
+        : {}),
       originalFileName: r.originalFileName ?? r.fileName,
+      ...(highlightsStale ? { annotatedKey: undefined } : {}),
     };
+  }
+
+  /** Apply a patch; if it retired the annotated copy, drop the orphan blob. */
+  async function applyPatch(r: Receipt, patch: Partial<Receipt>): Promise<void> {
+    const oldKey = r.annotatedKey;
+    await repo.updateReceipt(r.id, patch);
+    if ("annotatedKey" in patch && oldKey) {
+      await repo.deleteBlob(oldKey).catch(() => {});
+    }
   }
 
   async function save(): Promise<void> {
     const r = current;
     if (!r) return;
-    await repo.updateReceipt(r.id, patchFromForm(r));
+    await applyPatch(r, patchFromForm(r));
   }
 
   async function approveAndNext(): Promise<void> {
@@ -105,7 +131,7 @@
     const keptFlags = ($state.snapshot(r.flags) as Receipt["flags"]).filter(
       (f) => f.severity === "error" && f.code === "no_amount",
     );
-    await repo.updateReceipt(r.id, {
+    await applyPatch(r, {
       ...patch,
       approved: true,
       reviewRequired: false,

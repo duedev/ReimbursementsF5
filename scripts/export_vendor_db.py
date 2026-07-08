@@ -33,7 +33,7 @@ MISC_REFINE: list[tuple[str, re.Pattern[str]]] = [
     ("Lodging", re.compile(r"\b(hotel|hotels|inn|suites|resort|lodge|motel)\b", re.I)),
     ("Travel", re.compile(r"\b(air lines|airlines|airways|air)\b$", re.I)),
     (
-        "Meals & Entertainment",
+        "Meals",
         re.compile(
             r"\b(pizza|burger|taco|grill|cafe|caffe|coffee|donuts?|doughnuts|bakery|"
             r"restaurant|steakhouse|sushi|bbq|barbecue|chicken|sandwich(es)?|subs?|"

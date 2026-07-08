@@ -1,7 +1,7 @@
 import { repo } from "../store/repo.ts";
 import { cleanImage, binarizeBlob } from "./imagePrep.ts";
 import { hashBlob } from "./hash.ts";
-import { parseReceipt, type Extraction } from "./extract.ts";
+import { parseReceipt, forcesManualReview, type Extraction } from "./extract.ts";
 import { findSemanticDuplicate, type DupRecord } from "./dedup.ts";
 import { getOcrEngine, type OcrEngine } from "./ocr.ts";
 import { runVisionAssist } from "./vision/index.ts";
@@ -197,9 +197,8 @@ export async function processReceipt(
       }
     }
 
-    const hasError = flags.some((f) => f.severity === "error");
     const needsReview =
-      hasError ||
+      forcesManualReview(flags) ||
       Boolean(duplicateOf) ||
       ex.confidence < CONFIDENCE.reviewBelow ||
       ex.amount.value <= 0;

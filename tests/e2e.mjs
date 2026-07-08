@@ -231,7 +231,7 @@ async function main() {
     const coffee = byFile("coffee.png");
     check(coffee.amount === 8.99, `coffee: OCR+rules read the total (got ${coffee.amount})`);
     check(/BLUE|BOTTLE|COFFEE/i.test(coffee.vendor || ""), `coffee: vendor (got ${coffee.vendor})`);
-    check(coffee.cat === "Meals & Entertainment", `coffee: categorized (got ${coffee.cat})`);
+    check(coffee.cat === "Meals", `coffee: categorized (got ${coffee.cat})`);
     check(coffee.cost === 0 && coffee.method === "rules", "coffee: recorded as free (rules, $0)");
 
     const gas = byFile("gas.png");
@@ -281,7 +281,7 @@ async function main() {
     check(names.includes("Summary"), "workbook has Summary sheet");
     check(names.includes("Insights"), "workbook has Insights sheet");
     check(
-      names.includes("Meals & Entertainment") && names.includes("Fuel"),
+      names.includes("Meals") && names.includes("Fuel"),
       `workbook has the category sheets (sheets: ${names.join(", ")})`,
     );
     check(

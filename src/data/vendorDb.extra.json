@@ -35,7 +35,7 @@
   },
   {
     "name": "AMC Theatres",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "amc theatre",
       "amc theatres"
@@ -325,7 +325,7 @@
   },
   {
     "name": "Buffalo Wild Wings",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "buffalo wild wings"
     ]
@@ -339,7 +339,7 @@
   },
   {
     "name": "Burger King",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "burger king"
     ]
@@ -593,7 +593,7 @@
   },
   {
     "name": "Del Taco",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "del taco"
     ]
@@ -689,7 +689,7 @@
   },
   {
     "name": "Dunkin'",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "dunkin",
       "dunkin donuts",
@@ -809,7 +809,7 @@
   },
   {
     "name": "Firehouse Subs",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "firehouse subs"
     ]
@@ -1070,7 +1070,7 @@
   },
   {
     "name": "In-N-Out Burger",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "in n out",
       "in-n-out"
@@ -1154,7 +1154,7 @@
   },
   {
     "name": "KFC",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "kentucky fried chicken",
       "kfc"
@@ -1529,7 +1529,7 @@
   },
   {
     "name": "Outback Steakhouse",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "outback steakhouse"
     ]
@@ -1631,7 +1631,7 @@
   },
   {
     "name": "Pizza Hut",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "pizza hut"
     ]
@@ -1754,7 +1754,7 @@
   },
   {
     "name": "Regal Cinemas",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "regal cinemas"
     ]
@@ -2077,7 +2077,7 @@
   },
   {
     "name": "Taco Bell",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "taco bell"
     ]
@@ -2101,7 +2101,7 @@
   },
   {
     "name": "Texas Roadhouse",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "texas roadhouse"
     ]
@@ -2298,7 +2298,7 @@
   },
   {
     "name": "Waffle House",
-    "category": "Meals & Entertainment",
+    "category": "Meals",
     "aliases": [
       "waffle house"
     ]

@@ -48,7 +48,7 @@ test("CSV has the expected header and is sorted by date", () => {
 
 test("fields with commas and quotes are RFC-4180 escaped", () => {
   const csv = toCsv([
-    receipt({ vendor: 'Butch\'s, "Grinders"', amount: 18.5, category: "Meals & Entertainment", date: "2026-05-02" }),
+    receipt({ vendor: 'Butch\'s, "Grinders"', amount: 18.5, category: "Meals", date: "2026-05-02" }),
   ]);
   // The vendor, containing a comma and quotes, is wrapped and inner-quotes doubled.
   assert.ok(csv.includes('"Butch\'s, ""Grinders"""'));

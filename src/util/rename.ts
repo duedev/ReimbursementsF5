@@ -9,7 +9,7 @@ import type { Category } from "../types.ts";
 const CATEGORY_PREFIX: Record<Category, string> = {
   Fuel: "fuel",
   Materials: "mats",
-  "Meals & Entertainment": "meals",
+  "Meals": "meals",
   Travel: "travel",
   Lodging: "lodging",
   "Ground Transportation": "transport",
