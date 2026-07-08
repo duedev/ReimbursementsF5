@@ -453,3 +453,31 @@ test("date/amount markers are sliced to the match, not full-width", () => {
   );
   assert.ok(r.date.bbox && r.date.bbox.w < 0.5, `date box w=${r.date.bbox?.w}`);
 });
+
+// ── Round 4: live-board diagnostics (PRICEZG, ©-dates, split money tokens) ──
+
+test("PRICEZG (slash read as Z) still counts as pump structure", () => {
+  const r = parseReceipt(
+    ocr(["WELCOME TO", "nob", "GALLONS: 17.153", "PRICEZG: $4.699", "FUEL SALE $80.60", "CREDIT $80.60"]),
+  );
+  assert.equal(r.category.value, "Fuel");
+  assert.equal(r.amount.value, 80.6);
+});
+
+test("© and other stamp glyphs in dates fold to digits", () => {
+  const r = parseReceipt(ocr(["Chevron", "©2/01/2©23 1 339856883", "FUEL TOTAL $ 108.30"]));
+  assert.equal(r.date.value, "2023-02-01");
+});
+
+test("money token split by a space around the decimal is recovered", () => {
+  const r = parseReceipt(
+    ocr([
+      "SHOP",
+      "2819.28 38.56",
+      "SUBTOTAL 229.85",
+      "XXLES XXX",
+      "XXTAL USD$ 248. 81", // OCR split the cents off the dot
+    ]),
+  );
+  assert.equal(r.amount.value, 248.81, `amount ${r.amount.value}`);
+});
