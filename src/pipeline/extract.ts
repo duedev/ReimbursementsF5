@@ -94,6 +94,24 @@ function moneyHitsFromLine(line: OcrLine, lenient = false): MoneyHit[] {
       }
     }
   }
+  if (hits.length === 0) {
+    // OCR often injects a space around the decimal point ("USD$ 248. 81"),
+    // splitting the money token — retry once on a space-collapsed copy.
+    const collapsed = line.text
+      .replace(/(\d)\s+([.,])\s*(\d{2})(?!\d)/g, "$1$2$3")
+      .replace(/(\d)([.,])\s+(\d{2})(?!\d)/g, "$1$2$3");
+    if (collapsed !== line.text) {
+      for (const m of collapsed.matchAll(new RegExp(MONEY_SRC, "g"))) {
+        const v = parseAmount(m[0]);
+        if (v !== null) {
+          const hit: MoneyHit = { value: v };
+          const b = sliceBBox(line, m.index ?? 0, (m.index ?? 0) + m[0].length);
+          if (b) hit.bbox = b;
+          hits.push(hit);
+        }
+      }
+    }
+  }
   if (hits.length === 0 && lenient) {
     // Lenient pass (labeled-total lines only): a bare integer can be the value
     // ("TOTAL 9"), but blank date/time tokens (same-length, offsets preserved)
@@ -263,16 +281,18 @@ interface DateHit {
 /** Repair digit-glyph confusions INSIDE numeric-date-shaped tokens only
  *  ("l2/O2/2@23" → "12/02/2023") — month names elsewhere stay untouched. */
 function fixDateGlyphs(t: string): string {
-  const digitish = "[\\dOoIlSB@]";
+  const digitish = "[\\dOoQIlL|SBGZ@©®°]";
   const re = new RegExp(
     `(?<![A-Za-z\\d])${digitish}{1,4}[-/.]${digitish}{1,2}[-/.]${digitish}{2,4}(?![A-Za-z\\d])`,
     "g",
   );
   return t.replace(re, (tok) =>
     tok
-      .replace(/[Oo@]/g, "0")
-      .replace(/[Il]/g, "1")
+      .replace(/[OoQ@©®°]/g, "0")
+      .replace(/[IlL|]/g, "1")
+      .replace(/Z/g, "2")
       .replace(/S/g, "5")
+      .replace(/G/g, "6")
       .replace(/B/g, "8"),
   );
 }
@@ -490,7 +510,7 @@ function cleanVendorName(raw: string): string {
 // against 6.927 gal × $4.599 is caught immediately.
 
 const FUEL_QTY_RE = /\b(?:gallons?|gal|litres?|liters?)\b/i;
-const FUEL_UNIT_RE = /(?:price\s*\/?\s*g(?:al(?:lon)?)?|per\s+gal(?:lon)?|\$\s*\/\s*g)/i;
+const FUEL_UNIT_RE = /(?:price\s*[\/z7l1\\]?\s*g(?:al(?:lon)?)?\b|per\s+gal(?:lon)?|\$\s*\/\s*g)/i;
 const PLAIN_NUM_RE = /\d+\.\d{1,3}/g;
 
 /** gallons × price/gal from the printed pump lines, or null. */
