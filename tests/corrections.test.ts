@@ -92,3 +92,43 @@ test("unchanged fields produce no correction records", () => {
   );
   assert.equal(records.length, 0);
 });
+
+import { mergeCorrections, type CorrectionRecord } from "../src/train/corrections.ts";
+
+function rec(field: CorrectionRecord["field"], from: string | number, to: string | number): CorrectionRecord {
+  return {
+    ts: 1, receiptId: "r1", fileName: "f.jpg", field, from, to,
+    located: false, confidence: 0.5, method: "rules",
+  };
+}
+
+test("mergeCorrections collapses typing churn into one original→final record", () => {
+  // The date input fires a change per typed segment.
+  let log: CorrectionRecord[] = [];
+  for (const [from, to] of [
+    ["", "0002-09-11"], ["0002-09-11", "0020-09-11"],
+    ["0020-09-11", "0202-09-11"], ["0202-09-11", "2024-09-11"],
+  ] as const) {
+    log = mergeCorrections(log, [rec("date", from, to)]);
+  }
+  assert.equal(log.length, 1);
+  assert.equal(log[0]!.from, "");
+  assert.equal(log[0]!.to, "2024-09-11");
+});
+
+test("mergeCorrections drops a correction reverted to the original", () => {
+  let log = mergeCorrections([], [rec("vendor", "nob", "Mobil")]);
+  log = mergeCorrections(log, [rec("vendor", "Mobil", "Mob il")]);
+  log = mergeCorrections(log, [rec("vendor", "Mob il", "Mobil")]);
+  assert.equal(log.length, 1);
+  assert.deepEqual([log[0]!.from, log[0]!.to], ["nob", "Mobil"]);
+  // …and a full revert to the very first value vanishes.
+  log = mergeCorrections(log, [rec("vendor", "Mobil", "nob")]);
+  assert.equal(log.length, 0);
+});
+
+test("mergeCorrections keeps unrelated corrections separate", () => {
+  let log = mergeCorrections([], [rec("vendor", "nob", "Mobil")]);
+  log = mergeCorrections(log, [rec("amount", 2819.28, 248.81)]);
+  assert.equal(log.length, 2);
+});

@@ -73,10 +73,40 @@ export function buildCorrectionRecords(
   return out;
 }
 
+/** Pure: fold new records into the log, collapsing edit churn. Typing
+ *  through a date field fires a save per segment ("0002-09-11" →
+ *  "0020-09-11" → … → "2024-09-11"); only the original → final correction is
+ *  worth learning from. A correction that ends back at the original value
+ *  disappears entirely. */
+export function mergeCorrections(
+  log: CorrectionRecord[],
+  records: CorrectionRecord[],
+): CorrectionRecord[] {
+  const out = [...log];
+  for (const rec of records) {
+    const last = out[out.length - 1];
+    if (
+      last &&
+      last.receiptId === rec.receiptId &&
+      last.field === rec.field &&
+      String(last.to) === String(rec.from)
+    ) {
+      if (String(last.from) === String(rec.to)) {
+        out.pop(); // net-zero: reverted to the original value
+      } else {
+        out[out.length - 1] = { ...rec, from: last.from };
+      }
+      continue;
+    }
+    out.push(rec);
+  }
+  return out.slice(-MAX_RECORDS);
+}
+
 export async function appendCorrections(records: CorrectionRecord[]): Promise<void> {
   if (records.length === 0) return;
   const cur = (await repo.getSetting<CorrectionRecord[]>(KEY)) ?? [];
-  await repo.setSetting(KEY, [...cur, ...records].slice(-MAX_RECORDS));
+  await repo.setSetting(KEY, mergeCorrections(cur, records));
 }
 
 export async function getCorrections(): Promise<CorrectionRecord[]> {
