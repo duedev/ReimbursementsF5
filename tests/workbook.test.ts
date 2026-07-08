@@ -186,7 +186,7 @@ test("no app-generated notes reach the report; credits sit at the top", async ()
   // rows beside the employee info.
   const summary = wb.getWorksheet("Summary")!;
   const gen = String(summary.getCell(2, 5).value ?? "");
-  assert.match(gen, /^Generated .* by PocketBack$/, gen);
+  assert.match(gen, /^Generated .* by DueBack$/, gen);
   const link = summary.getCell(3, 5).value as { hyperlink?: string } | null;
   assert.ok(
     link && typeof link === "object" && /github\.com\/duedev/.test(link.hyperlink ?? ""),

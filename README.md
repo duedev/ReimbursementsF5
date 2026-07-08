@@ -1,6 +1,6 @@
-# PocketBack
+# DueBack
 
-**Receipts in. Your out-of-pocket money back.**
+**Receipts in. What you're due, back.**
 
 Snap or drop a pile of receipts. They're read **on your device**, the text
 *and* the logos. You review the flagged ones in a keyboard-driven sweep, and

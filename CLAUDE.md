@@ -4,7 +4,7 @@
 
 ## What this is
 
-**PocketBack** (repo `ReimbursementsF5`, formerly "Reimbursements F5") — a
+**DueBack** (repo `ReimbursementsF5`, formerly "Reimbursements F5") — a
 browser-only receipt → reimbursement-report app. `APP_NAME` in
 `src/config/constants.ts` is the single product-name source; the IndexedDB
 name stays `reimbursements-f5` so existing users keep their data.

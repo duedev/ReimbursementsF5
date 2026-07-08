@@ -60,8 +60,8 @@
   <!-- ======================= nav ======================= -->
   <nav class="wrap nav">
     <div class="brand">
-      <span class="brand-mark">PB</span>
-      <span class="brand-name">PocketBack</span>
+      <span class="brand-mark">DB</span>
+      <span class="brand-name">DueBack</span>
     </div>
     <div class="nav-links">
       <a href="#how">How it works</a>
@@ -289,7 +289,7 @@
   </section>
 
   <footer class="wrap foot">
-    <span>PocketBack</span>
+    <span>DueBack</span>
     <span class="foot-sep">·</span>
     <a href="https://github.com/duedev/ReimbursementsF5" rel="noopener">GitHub</a>
     <span class="foot-sep">·</span>

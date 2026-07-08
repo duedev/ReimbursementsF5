@@ -74,7 +74,7 @@ export function createOpenRouterProvider(init: ProviderInit): VisionProvider {
           "Content-Type": "application/json",
           Authorization: `Bearer ${init.apiKey}`,
           "HTTP-Referer": appOrigin(),
-          "X-Title": "PocketBack",
+          "X-Title": "DueBack",
         },
         body: JSON.stringify(body),
       });

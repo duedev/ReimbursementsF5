@@ -29,8 +29,8 @@
         title="Back to the home page"
         aria-label="Back to the home page"
       >
-        <span class="brand-mark">PB</span>
-        <span class="brand-name">PocketBack</span>
+        <span class="brand-mark">DB</span>
+        <span class="brand-name">DueBack</span>
       </button>
       {#if total > 0}
         <div class="progress" aria-label="Processing progress">
