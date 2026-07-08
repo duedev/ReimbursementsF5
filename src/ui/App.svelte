@@ -12,7 +12,7 @@
 
 {#if app.booting}
   <div class="splash" aria-label="Loading">
-    <div class="splash-mark">F5</div>
+    <div class="splash-mark">PB</div>
   </div>
 {:else if app.showWorkspace}
   <Workspace />

@@ -32,8 +32,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icons/favicon.svg", "icons/apple-touch-icon.png"],
       manifest: {
-        name: "Reimbursements F5",
-        short_name: "Reimburse",
+        name: "PocketBack",
+        short_name: "PocketBack",
         description:
           "Receipts in. Reimbursement report out. On-device OCR + logo recognition, polished Excel export, optional cloud sync.",
         theme_color: "#12100e",
