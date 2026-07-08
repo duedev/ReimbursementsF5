@@ -41,10 +41,11 @@
   }
   const sorted = $derived([...app.receipts].sort(compare));
 
-  // Kanban lanes: attention first, then the pipeline, then done.
+  // Kanban lanes in pipeline order: Processing leads while a batch is running
+  // (it hides when empty), then the receipts needing a human, then done.
   const LANES: { key: string; label: string; match: (r: Receipt) => boolean }[] = [
-    { key: "review", label: "Needs review", match: (r) => r.status === "needs_review" },
     { key: "working", label: "Processing", match: (r) => r.status === "queued" || r.status === "processing" },
+    { key: "review", label: "Needs review", match: (r) => r.status === "needs_review" },
     { key: "done", label: "Done", match: (r) => r.status === "done" },
     { key: "failed", label: "Failed", match: (r) => r.status === "failed" },
   ];
