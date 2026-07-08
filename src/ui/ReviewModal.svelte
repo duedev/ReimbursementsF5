@@ -69,7 +69,14 @@
     const amt = parseAmount(amount);
     const tx = parseAmount(tax);
     const newVendor = vendor.trim();
-    const newDate = date && isValidIso(date) ? date : r.date.value;
+    // The native date input fires a change per typed segment ("0002-09-11",
+    // "0020-09-11", …) — a year outside a sane range is a partial entry,
+    // not a correction, and must not save/rename/log.
+    const saneYear = (iso: string): boolean => {
+      const y = Number(iso.slice(0, 4));
+      return y >= 1990 && y <= 2100;
+    };
+    const newDate = date && isValidIso(date) && saneYear(date) ? date : r.date.value;
     const newAmount = amt !== null ? safeAmount(amt) : r.amount.value;
     return {
       vendor: { value: newVendor, confidence: 1, edited: true, ...(r.vendor.bbox ? { bbox: r.vendor.bbox } : {}) },
@@ -191,17 +198,16 @@
       status: "done",
       flags: amountOk ? [] : keptFlags,
     });
-    // Advance to the next receipt that still wants a look; else next; else done.
+    // Advance ONLY through receipts that still need review (after this one,
+    // wrapping to earlier ones) — the sweep must not cycle back through
+    // already-done receipts. When none remain, the sweep is over.
     const fresh = app.receipts;
-    const after = fresh.findIndex(
+    const after = fresh.find(
       (x, i) => i > index && x.reviewRequired && !x.approved,
     );
-    if (after >= 0) {
-      const target = fresh[after];
-      if (target) app.reviewId = target.id;
-    } else if (index < fresh.length - 1) {
-      const target = fresh[index + 1];
-      if (target) app.reviewId = target.id;
+    const target = after ?? fresh.find((x) => x.reviewRequired && !x.approved);
+    if (target) {
+      app.reviewId = target.id;
     } else {
       app.toast("All caught up. Every receipt reviewed.", "ok");
       close();

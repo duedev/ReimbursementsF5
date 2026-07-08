@@ -53,7 +53,9 @@ export async function processReceipt(
       ocr = {
         text: cached.ocrText,
         confidence: cached.confidence * 100,
-        lines: [],
+        // Reuse the cached geometry too — without it, a re-uploaded duplicate
+        // can never locate corrections or heal its highlights.
+        lines: cached.ocrLines ?? [],
         words: [],
       };
     } else {
