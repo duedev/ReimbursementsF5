@@ -201,13 +201,14 @@
     margin-inline: auto;
   }
 
-  /* Floating camera — touch devices only. */
+  /* Floating camera — touch devices only. Stays UNDER the review/settings
+     overlays (z-index 50), which otherwise render behind it on phones. */
   .camera-fab {
     display: none;
     position: fixed;
     right: 1.1rem;
     bottom: 1.3rem;
-    z-index: 60;
+    z-index: 45;
     width: 3.6rem;
     height: 3.6rem;
     border: 0;

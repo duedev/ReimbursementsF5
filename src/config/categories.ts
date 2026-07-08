@@ -16,7 +16,7 @@ import { matchVendor, wordBoundaryMatcher, type VendorMatch } from "./vendors.ts
 export const CATEGORIES: Category[] = [
   "Fuel",
   "Materials",
-  "Meals & Entertainment",
+  "Meals",
   "Travel",
   "Lodging",
   "Ground Transportation",
@@ -31,7 +31,7 @@ export const CATEGORIES: Category[] = [
 /** Display metadata used by the board chips and the workbook theming. */
 export const CATEGORY_META: Record<Category, { color: string; emoji: string }> =
   {
-    "Meals & Entertainment": { color: "FFF97316", emoji: "🍽️" },
+    "Meals": { color: "FFF97316", emoji: "🍽️" },
     Travel: { color: "FF0EA5E9", emoji: "✈️" },
     Lodging: { color: "FF8B5CF6", emoji: "🏨" },
     "Ground Transportation": { color: "FF06B6D4", emoji: "🚕" },
@@ -73,7 +73,7 @@ const RULES: Rule[] = [
     keywords: ["airline", "airlines", "airways", "airport", "boarding pass", "baggage", "flight"],
   },
   {
-    category: "Meals & Entertainment",
+    category: "Meals",
     keywords: [
       "restaurant", "cafe", "café", "coffee", "bakery", "deli", "bistro", "diner",
       "grill", "kitchen", "tavern", "brewery", "brewing", "winery", "catering",

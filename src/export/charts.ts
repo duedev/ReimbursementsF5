@@ -24,7 +24,11 @@ export interface ChartImage {
 const INK_SOFT = "#55524d";
 const GRID = "rgba(85, 82, 77, 0.14)";
 const ACCENT = "#147246";
-const FONT = { family: "Inter, system-ui, sans-serif", size: 16 };
+// Charts render at 900px and are embedded at ~0.62 scale, so on-sheet text is
+// ~62% of these sizes. 26px body / 34px titles ≈ 16px / 21px at 100% zoom —
+// comfortably larger than Excel's default cell text ("text too small" fix).
+const FONT = { family: "Inter, system-ui, sans-serif", size: 26 };
+const TITLE_SIZE = 34;
 
 function argbToCss(argb: string): string {
   // "FFRRGGBB" → "#RRGGBB"
@@ -75,25 +79,25 @@ export async function categoryChartImage(
   const colors = rows.map((c) =>
     argbToCss(CATEGORY_META[c.category as Category]?.color ?? "FF94A3B8"),
   );
-  const height = 90 + rows.length * 52;
+  const height = 110 + rows.length * 64;
   return renderToPng(
     {
       type: "bar",
       data: {
-        labels: rows.map((c) => c.category),
+        labels: rows.map((c) => (c.category === "Other" ? "Miscellaneous" : c.category)),
         datasets: [
           {
             data: rows.map((c) => c.total),
             backgroundColor: colors,
             borderRadius: { topRight: 4, bottomRight: 4 },
             borderSkipped: "start",
-            barThickness: 30,
+            barThickness: 36,
           },
         ],
       },
       options: {
         indexAxis: "y",
-        layout: { padding: { right: 96, top: 10, bottom: 6 } },
+        layout: { padding: { right: 150, top: 10, bottom: 6 } },
         plugins: {
           legend: { display: false },
           title: {
@@ -101,7 +105,7 @@ export async function categoryChartImage(
             text: "Spend by category",
             align: "start",
             color: "#1c1917",
-            font: { ...FONT, size: 20, weight: "bold" },
+            font: { ...FONT, size: TITLE_SIZE, weight: "bold" },
             padding: { bottom: 10 },
           },
           tooltip: { enabled: false },
@@ -144,7 +148,7 @@ export async function dailyChartImage(
             backgroundColor: ACCENT,
             borderRadius: { topLeft: 4, topRight: 4 },
             borderSkipped: "bottom",
-            maxBarThickness: 40,
+            maxBarThickness: 48,
           },
         ],
       },
@@ -157,7 +161,7 @@ export async function dailyChartImage(
             text: "Daily spend",
             align: "start",
             color: "#1c1917",
-            font: { ...FONT, size: 20, weight: "bold" },
+            font: { ...FONT, size: TITLE_SIZE, weight: "bold" },
             padding: { bottom: 10 },
           },
           tooltip: { enabled: false },
@@ -178,7 +182,7 @@ export async function dailyChartImage(
       plugins: [barEndLabels("x")],
     },
     900,
-    400,
+    460,
   );
 }
 
@@ -188,7 +192,7 @@ export async function vendorsChartImage(
 ): Promise<ChartImage | null> {
   const rows = insights.topVendors.filter((v) => v.total > 0).slice(0, 6);
   if (rows.length < 2) return null;
-  const height = 90 + rows.length * 46;
+  const height = 110 + rows.length * 58;
   return renderToPng(
     {
       type: "bar",
@@ -200,13 +204,13 @@ export async function vendorsChartImage(
             backgroundColor: ACCENT,
             borderRadius: { topRight: 4, bottomRight: 4 },
             borderSkipped: "start",
-            barThickness: 26,
+            barThickness: 32,
           },
         ],
       },
       options: {
         indexAxis: "y",
-        layout: { padding: { right: 90, top: 10, bottom: 6 } },
+        layout: { padding: { right: 150, top: 10, bottom: 6 } },
         plugins: {
           legend: { display: false },
           title: {
@@ -214,7 +218,7 @@ export async function vendorsChartImage(
             text: "Top vendors",
             align: "start",
             color: "#1c1917",
-            font: { ...FONT, size: 20, weight: "bold" },
+            font: { ...FONT, size: TITLE_SIZE, weight: "bold" },
             padding: { bottom: 10 },
           },
           tooltip: { enabled: false },
@@ -258,9 +262,9 @@ export async function cumulativeChartImage(
             borderColor: ACCENT,
             backgroundColor: "rgba(20, 114, 70, 0.12)",
             fill: true,
-            pointRadius: 3,
+            pointRadius: 4,
             pointBackgroundColor: ACCENT,
-            borderWidth: 3,
+            borderWidth: 4,
             tension: 0.25,
           },
         ],
@@ -274,7 +278,7 @@ export async function cumulativeChartImage(
             text: "Cumulative spend",
             align: "start",
             color: "#1c1917",
-            font: { ...FONT, size: 20, weight: "bold" },
+            font: { ...FONT, size: TITLE_SIZE, weight: "bold" },
             padding: { bottom: 10 },
           },
           tooltip: { enabled: false },
@@ -299,7 +303,7 @@ export async function cumulativeChartImage(
       },
     },
     900,
-    400,
+    460,
   );
 }
 
@@ -336,14 +340,14 @@ export async function shareChartImage(
         plugins: {
           legend: {
             position: "right",
-            labels: { color: "#1c1917", font: FONT, boxWidth: 14, padding: 10 },
+            labels: { color: "#1c1917", font: FONT, boxWidth: 22, padding: 14 },
           },
           title: {
             display: true,
             text: "Share of spend",
             align: "start",
             color: "#1c1917",
-            font: { ...FONT, size: 20, weight: "bold" },
+            font: { ...FONT, size: TITLE_SIZE, weight: "bold" },
             padding: { bottom: 6 },
           },
           tooltip: { enabled: false },
@@ -351,7 +355,7 @@ export async function shareChartImage(
       },
     },
     900,
-    380,
+    460,
   );
 }
 
@@ -366,7 +370,7 @@ function barEndLabels(indexAxis: "x" | "y") {
       if (!data) return;
       ctx.save();
       ctx.fillStyle = INK_SOFT;
-      ctx.font = `600 15px ${FONT.family}`;
+      ctx.font = `600 24px ${FONT.family}`;
       meta.data.forEach((el, i) => {
         const v = data[i];
         if (v === undefined || v <= 0) return;

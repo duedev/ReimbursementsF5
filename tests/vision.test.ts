@@ -21,14 +21,14 @@ test("a clean model response maps to a high-confidence extraction", () => {
     amount: 8.99,
     tax: 0.74,
     currency: "usd",
-    category: "Meals & Entertainment",
+    category: "Meals",
   });
   assert.equal(ex.vendor.value, "Blue Bottle Coffee");
   assert.equal(ex.amount.value, 8.99);
   assert.equal(ex.tax.value, 0.74);
   assert.equal(ex.date.value, "2026-03-14");
   assert.equal(ex.currency, "USD"); // normalized to upper-case
-  assert.equal(ex.category.value, "Meals & Entertainment");
+  assert.equal(ex.category.value, "Meals");
   assert.ok(ex.confidence >= 0.8); // all fields present ⇒ auto-done
   assert.ok(!ex.flags.some((f) => f.code === "no_amount"));
 });

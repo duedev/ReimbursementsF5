@@ -6,8 +6,20 @@ import type {
   StoredBlob,
   StoredBrand,
   ReceiptStatus,
+  Category,
 } from "../types.ts";
 import { uid } from "../util/id.ts";
+
+// Categories renamed since older data was stored (locally or in Supabase).
+// Normalized on every read so legacy receipts keep working untouched.
+const LEGACY_CATEGORIES: Record<string, Category> = {
+  "Meals & Entertainment": "Meals",
+};
+
+function normalizeReceipt(r: Receipt): Receipt {
+  const mapped = LEGACY_CATEGORIES[r.category?.value as string];
+  return mapped ? { ...r, category: { ...r.category, value: mapped } } : r;
+}
 
 // Repository over the local stores. This is the one place that reads/writes the
 // source of truth, and the one place that announces changes — the UI subscribes
@@ -98,7 +110,8 @@ class Repo {
   }
 
   async getReceipt(id: string): Promise<Receipt | undefined> {
-    return (await db()).get("receipts", id);
+    const r = await (await db()).get("receipts", id);
+    return r ? normalizeReceipt(r) : undefined;
   }
 
   async updateReceipt(id: string, patch: Partial<Receipt>): Promise<Receipt | undefined> {
@@ -112,11 +125,12 @@ class Repo {
 
   async listReceipts(batchId: string): Promise<Receipt[]> {
     const all = await (await db()).getAllFromIndex("receipts", "byBatch", batchId);
-    return all.sort((a, b) => a.createdAt - b.createdAt);
+    return all.map(normalizeReceipt).sort((a, b) => a.createdAt - b.createdAt);
   }
 
   async findByHash(hash: string): Promise<Receipt[]> {
-    return (await db()).getAllFromIndex("receipts", "byHash", hash);
+    const all = await (await db()).getAllFromIndex("receipts", "byHash", hash);
+    return all.map(normalizeReceipt);
   }
 
   async deleteReceipt(id: string): Promise<void> {

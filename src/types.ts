@@ -17,7 +17,7 @@ export type ExtractionMethod = "rules" | "paid";
 
 /** Expense categories used for the per-category sheets and the lookup table. */
 export type Category =
-  | "Meals & Entertainment"
+  | "Meals"
   | "Travel"
   | "Lodging"
   | "Ground Transportation"
@@ -45,6 +45,7 @@ export type FlagCode =
   | "no_date"
   | "no_vendor"
   | "total_mismatch"
+  | "vendor_unclear"
   | "future_date"
   | "stale_date"
   | "duplicate"

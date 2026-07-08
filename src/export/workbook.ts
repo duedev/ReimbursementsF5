@@ -38,7 +38,7 @@ const CATEGORY_TINTS: Partial<Record<Category, string>> = {
   Fuel: "FFFFF3CC",
   Materials: "FFD4FAE8",
   "Office Supplies": "FFF0FDF4",
-  "Meals & Entertainment": "FFFFE4E6",
+  "Meals": "FFFFE4E6",
   Travel: "FFE0F2FE",
   Lodging: "FFEDE9FF",
   "Ground Transportation": "FFDBEAFE",
@@ -90,6 +90,77 @@ const FIELD_TINTS = {
 
 const IMG_DISPLAY_W = 380; // ≈ column A at width 55
 const IMG_ROW_PT = 14; // height of each image carrier row
+
+// ── Column autofit (ExcelJS has none) ────────────────────────────────────────
+
+/** Chars per wrapped line in the capped notes column, for row heights. */
+const NOTES_WRAP_CHARS = 44;
+
+/** Estimate a cell's rendered text length in default-font character units. */
+function displayLength(cell: ExcelJS.Cell): number {
+  const v = cell.value;
+  if (v === null || v === undefined) return 0;
+  if (v instanceof Date) return 8; // rendered m/d/yy
+  if (typeof v === "number") {
+    // Accounting format ≈ "$  1,234.56" — digits + grouping + symbol gutter.
+    return cell.numFmt
+      ? v.toLocaleString("en-US", { minimumFractionDigits: 2 }).length + 3
+      : String(v).length;
+  }
+  if (typeof v === "object") {
+    const o = v as { text?: unknown; result?: unknown; richText?: { text: string }[] };
+    if (typeof o.text === "string") return o.text.length; // hyperlink cell
+    if (o.richText) return o.richText.map((t) => t.text).join("").length;
+    if (o.result !== undefined) {
+      return typeof o.result === "number"
+        ? o.result.toLocaleString("en-US", { minimumFractionDigits: 2 }).length + 3
+        : String(o.result).length;
+    }
+    return 0;
+  }
+  return String(v)
+    .split("\n")
+    .reduce((m, line) => Math.max(m, line.length), 0);
+}
+
+/** Set each column's width to fit its longest cell (font size and bold
+ *  factored in). Merged cells are skipped — the full-width band rows would
+ *  otherwise balloon column A — as are explicitly skipped rows (footers). */
+function autofitColumns(
+  ws: ExcelJS.Worksheet,
+  cols: number[],
+  opts: { min?: number; max?: number; skipRows?: number[] } = {},
+): void {
+  const skip = new Set(opts.skipRows ?? []);
+  const want = new Map<number, number>();
+  ws.eachRow({ includeEmpty: false }, (row, rowNo) => {
+    if (skip.has(rowNo)) return;
+    row.eachCell({ includeEmpty: false }, (cell, colNo) => {
+      if (!cols.includes(colNo) || cell.isMerged) return;
+      const len = displayLength(cell);
+      if (len === 0) return;
+      const size = cell.font?.size ?? 11;
+      const bold = cell.font?.bold ? 1.06 : 1;
+      const units = len * (size / 11) * bold + 2.6;
+      want.set(colNo, Math.max(want.get(colNo) ?? 0, units));
+    });
+  });
+  for (const c of cols) {
+    const w = want.get(c);
+    if (w === undefined) continue;
+    ws.getColumn(c).width = Math.min(
+      opts.max ?? 46,
+      Math.max(opts.min ?? 8, Math.round(w * 10) / 10),
+    );
+  }
+}
+
+/** Row height (pt) that fits a note wrapped in the capped notes column. */
+function noteRowHeight(note: string, base: number, small = false): number {
+  if (!note) return base;
+  const lines = Math.ceil(note.length / NOTES_WRAP_CHARS);
+  return Math.max(base, lines * (small ? 12 : 14) + 8);
+}
 
 function exportable(receipts: Receipt[]): Receipt[] {
   return receipts
@@ -274,7 +345,11 @@ function writeReceiptCells(
     alignment: { horizontal: "right", vertical: "middle" },
   });
   set(7, "", { font: { size: 10, color: { argb: TEXT_GRAY } } });
-  set(8, notesFor(rec), { font: { size: 10, color: { argb: TEXT_GRAY } } });
+  set(8, notesFor(rec), {
+    font: { size: 10, color: { argb: TEXT_GRAY } },
+    // Long notes wrap inside a capped-width column instead of stretching it.
+    alignment: { horizontal: "left", vertical: "middle", wrapText: true },
+  });
 
   if (opts.bg) {
     for (let c = 1; c <= 8; c++) fill(line.getCell(c), opts.bg);
@@ -359,7 +434,7 @@ function buildSummarySheet(
         link: anchors.get(rec.id),
         bg: i % 2 === 1 ? ZEBRA_BLUE : WHITE,
       });
-      ws.getRow(r).height = 30;
+      ws.getRow(r).height = noteRowHeight(notesFor(rec), 30);
       r++;
     });
 
@@ -410,6 +485,10 @@ function buildSummarySheet(
   foot.getCell(7).font = { size: 9, color: { argb: FOOT_GRAY } };
   foot.getCell(8).value = "github.com/duedev/ReimbursementsF5";
   foot.getCell(8).font = { size: 9, color: { argb: LINK_BLUE } };
+
+  // Fit every column to its content (the footer note spans free space and
+  // would otherwise balloon column G).
+  autofitColumns(ws, [1, 2, 3, 4, 5, 6, 7, 8], { min: 6, max: 46, skipRows: [r] });
   return subtotalCells;
 }
 
@@ -481,13 +560,16 @@ function buildImageSheet(
 
     // Data row
     writeReceiptCells(ws, r, i + 1, rec, batch, fmt, { small: true, colorFields: true });
-    ws.getRow(r).height = 22;
+    ws.getRow(r).height = noteRowHeight(notesFor(rec), 22, true);
     r++;
 
     // Spacer
     ws.getRow(r).height = 8;
     r++;
   });
+
+  // Fit the data columns; column A stays fixed — it carries the images.
+  autofitColumns(ws, [2, 3, 4, 5, 6, 7, 8], { min: 8, max: 40 });
 }
 
 // ── Insights sheet — an executive dashboard ─────────────────────────────────

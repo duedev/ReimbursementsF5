@@ -66,7 +66,7 @@ export function challengeSuite(): Challenge[] {
     {
       id: "multi_total",
       description: "Subtotal + tax + grand total — must pick the grand total.",
-      truth: { vendor: "Olive Garden", date: "2026-05-10", amount: 86.31, category: "Meals & Entertainment" },
+      truth: { vendor: "Olive Garden", date: "2026-05-10", amount: 86.31, category: "Meals" },
       lines: [
         "Olive Garden",
         "Italian Kitchen",

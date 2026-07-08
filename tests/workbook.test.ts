@@ -49,7 +49,7 @@ const batch: Batch = {
 const receipts: Receipt[] = [
   receipt({ vendor: "Delta", amount: 320.5, category: "Travel", date: "2026-01-04" }),
   receipt({ vendor: "Marriott", amount: 210.0, category: "Lodging", date: "2026-01-05" }),
-  receipt({ vendor: "Blue Bottle", amount: 8.99, category: "Meals & Entertainment", date: "2026-01-05" }),
+  receipt({ vendor: "Blue Bottle", amount: 8.99, category: "Meals", date: "2026-01-05" }),
   receipt({ vendor: "Uber", amount: 23.4, category: "Ground Transportation", date: "2026-01-06" }),
 ];
 
@@ -145,7 +145,7 @@ test("sheet order: Summary, categories in taxonomy order, Insights rightmost", a
   assert.equal(names[names.length - 1], "Insights");
   // The Summary IS the receipt table (linked); no redundant flat copy.
   assert.ok(!names.includes("All Receipts"));
-  assert.deepEqual(names.slice(1, -1), ["Meals & Entertainment", "Travel", "Lodging", "Ground Transportation"]);
+  assert.deepEqual(names.slice(1, -1), ["Meals", "Travel", "Lodging", "Ground Transportation"]);
 });
 
 test('"Other" receipts are labeled Miscellaneous in the report', async () => {
@@ -194,4 +194,39 @@ test("Insights Total Spend foots from the Summary's subtotal formulas", async ()
     });
   });
   assert.ok(sawFormula, "insights Total Spend references the Summary subtotals");
+});
+
+test("columns autofit to content; notes wrap in a capped column", async () => {
+  const long = receipt({
+    vendor: "Consolidated Building Materials Warehouse",
+    amount: 1234.56,
+    category: "Materials",
+    date: "2026-01-09",
+  });
+  long.flags = [
+    {
+      code: "total_mismatch",
+      severity: "warn",
+      message:
+        "Total 1234.56 is far above the printed subtotal 229.85 — needs review. Double-check against the receipt image before approving.",
+    },
+  ];
+  const result = await buildWorkbook(batch, [long], async () => undefined);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await result.blob.arrayBuffer());
+  const summary = wb.getWorksheet("Summary")!;
+  // Store column grew to fit the 42-char vendor (default was 24).
+  const store = summary.getColumn(3).width ?? 0;
+  assert.ok(store > 30, `store col width ${store}`);
+  // Notes column stays capped and wraps instead of stretching to 120+ chars.
+  const notes = summary.getColumn(8).width ?? 0;
+  assert.ok(notes <= 46, `notes col width ${notes}`);
+  let sawWrap = false;
+  summary.eachRow((row) => {
+    const cell = row.getCell(8);
+    if (typeof cell.value === "string" && cell.value.includes("far above")) {
+      sawWrap = cell.alignment?.wrapText === true;
+    }
+  });
+  assert.ok(sawWrap, "notes cell wraps");
 });

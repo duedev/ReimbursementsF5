@@ -64,7 +64,9 @@
       }
       const zip = await buildZip(entries);
       const employee = (app.batch.employee || "Employee").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
-      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const now = new Date();
+      // Local date, matching the workbook's filename stamp (UTC drifted a day).
+      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
       download(zip, `Receipts_${employee}_${stamp}.zip`);
       app.toast(`Packaged ${entries.length} receipt images.`, "ok");
     } catch (err) {

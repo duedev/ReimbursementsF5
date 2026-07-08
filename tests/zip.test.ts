@@ -21,3 +21,11 @@ test("buildZip produces a well-formed archive", async () => {
   const view = new DataView(eocd.buffer, eocd.byteOffset);
   assert.equal(view.getUint16(8, true), 2, "entry count in EOCD");
 });
+
+test("buildZip fails loudly past the 65,535-entry ZIP limit", async () => {
+  const entries = Array.from({ length: 0x10000 }, (_, i) => ({
+    name: `f${i}`,
+    data: new Uint8Array(0),
+  }));
+  await assert.rejects(() => buildZip(entries), /Too many files/);
+});

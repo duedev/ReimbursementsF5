@@ -40,7 +40,7 @@ const rows: Receipt[] = [
   receipt({ vendor: "Shell", amount: 45.2, category: "Fuel", date: "2026-05-01" }),
   receipt({ vendor: "Shell", amount: 50.0, category: "Fuel", date: "2026-05-03" }),
   receipt({ vendor: "The Home Depot", amount: 120.0, category: "Office Supplies", date: "2026-05-02", flagged: true }),
-  receipt({ vendor: "Joe's Diner", amount: 18.5, category: "Meals & Entertainment", date: "2026-05-02", tax: 1.5 }),
+  receipt({ vendor: "Joe's Diner", amount: 18.5, category: "Meals", date: "2026-05-02", tax: 1.5 }),
 ];
 
 test("headline totals, average, largest and flagged", () => {

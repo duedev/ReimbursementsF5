@@ -32,7 +32,7 @@ test("restaurant receipt → vendor, date, total, tax, category", () => {
   assert.equal(r.tax.value, 0.74);
   assert.equal(r.date.value, "2026-03-14");
   assert.match(r.vendor.value, /BLUE BOTTLE/i);
-  assert.equal(r.category.value, "Meals & Entertainment");
+  assert.equal(r.category.value, "Meals");
   assert.ok(r.confidence > 0.6, `confidence ${r.confidence}`);
 });
 
@@ -418,7 +418,7 @@ test("fuzzy header sweep: one or two letters off resolves to the brand", () => {
     ocr(["FARMER 80YS", "WED SEPTEMBER 11,2024", "CHECK #606564-1", "1 BIG CHEESE CMB $12.49", "TOTAL $67.38"]),
   );
   assert.equal(farmer.vendor.value, "Farmer Boys");
-  assert.equal(farmer.category.value, "Meals & Entertainment");
+  assert.equal(farmer.category.value, "Meals");
 });
 
 test("garbled brand line M0BIL MART resolves via digit folds", () => {
@@ -480,4 +480,159 @@ test("money token split by a space around the decimal is recovered", () => {
     ]),
   );
   assert.equal(r.amount.value, 248.81, `amount ${r.amount.value}`);
+});
+
+// ── Adversarial-review findings: correction nets must not corrupt good reads ──
+
+import { forcesManualReview } from "../src/pipeline/extract.ts";
+
+test("fuel + car wash: the larger combined TOTAL survives pump math", () => {
+  const r = parseReceipt(
+    ocr([
+      "CHEVRON",
+      "05/03/2026 14:22",
+      "GALLONS 6.927",
+      "PRICE/GAL 4.599",
+      "FUEL TOTAL 31.86",
+      "CAR WASH 9.00",
+      "TOTAL 40.86",
+    ]),
+  );
+  assert.equal(r.amount.value, 40.86, `amount ${r.amount.value}`);
+  assert.equal(r.category.value, "Fuel");
+});
+
+test("grocery with a GAL item and a per-gallon promo is NOT pump-corrected", () => {
+  const r = parseReceipt(
+    ocr([
+      "KROGER",
+      "123 Main St",
+      "05/03/2026 14:22",
+      "MILK 1 GAL 4.99",
+      "BREAD 2.49",
+      "GROUND BEEF 12.87",
+      "SUBTOTAL 82.10",
+      "TAX 5.13",
+      "TOTAL 87.23",
+    ]),
+  );
+  assert.equal(r.amount.value, 87.23, `amount ${r.amount.value}`);
+});
+
+test('"PRICE GOOD THRU" is not a per-gallon price', () => {
+  const r = parseReceipt(
+    ocr(["SAFEWAY", "WATER 1 GAL 1.89", "CHICKEN 9.99", "TOTAL 45.60", "PRICE GOOD THRU 7.15"]),
+  );
+  assert.equal(r.amount.value, 45.6, `amount ${r.amount.value}`);
+});
+
+test("a per-gallon DISCOUNT line can't donate the gallons quantity", () => {
+  const r = parseReceipt(
+    ocr([
+      "SHELL",
+      "PUMP 05",
+      "DISCOUNT 1.00/GAL",
+      "GALLONS: 12.062",
+      "PRICE/GAL: 2.999",
+      "FUEL TOTAL 36.18",
+    ]),
+  );
+  assert.equal(r.amount.value, 36.18, `amount ${r.amount.value}`);
+});
+
+test("merged GALLONS…TOTAL OCR line: qty comes from beside the keyword", () => {
+  const r = parseReceipt(
+    ocr(["CHEVRON", "GALLONS: 6.927   TOTAL 31.86", "PRICE/GAL 4.599", "TOTAL 31.86"]),
+  );
+  assert.equal(r.amount.value, 31.86, `amount ${r.amount.value}`);
+});
+
+test("moderate pump-math disagreement keeps the printed total and forces review", () => {
+  // Gallons digit misread (6.327 vs true 6.927) — the printed total is right.
+  const r = parseReceipt(
+    ocr(["MOBIL", "GALLONS: 6.327", "PRICE/G: 4.599", "FUEL SALE 31.86"]),
+  );
+  assert.equal(r.amount.value, 31.86, `amount ${r.amount.value}`);
+  assert.ok(forcesManualReview(r.flags), JSON.stringify(r.flags));
+});
+
+test("restaurant tip: total above SUBTOTAL + TAX is not 'corrected' away", () => {
+  const r = parseReceipt(
+    ocr([
+      "JOES DINER",
+      "SUBTOTAL 50.00",
+      "TAX 4.00",
+      "AMOUNT 54.00",
+      "TIP 10.00",
+      "TOTAL 64.00",
+    ]),
+  );
+  assert.equal(r.amount.value, 64, `amount ${r.amount.value}`);
+});
+
+test("merchant names ending in state-shaped words still win the vendor slot", () => {
+  const r = parseReceipt(ocr(["SMITH SUPPLY CO", "TOTAL 12.00"]));
+  assert.equal(r.vendor.value, "SMITH SUPPLY CO");
+  const addr = parseReceipt(ocr(["Anaheim CA", "SOME SHOP", "TOTAL 12.00"]));
+  assert.notEqual(addr.vendor.value, "Anaheim CA");
+});
+
+// ── Manual-review gates: one-offs must surface, not ship ─────────────────────
+
+test("a garbled 3-letter vendor no table recognizes demands review", () => {
+  const r = parseReceipt(
+    ocr([
+      "WELCOME TO",
+      "nob",
+      "GALLONS: 17.153",
+      "PRICEZG: $4.699",
+      "FUEL SALE $80.60",
+      "CREDIT $80.60",
+    ]),
+  );
+  assert.equal(r.vendor.value, "nob");
+  assert.ok(
+    r.flags.some((f) => f.code === "vendor_unclear"),
+    JSON.stringify(r.flags),
+  );
+  assert.ok(forcesManualReview(r.flags));
+});
+
+test("total far above the printed subtotal (no tax read) demands review", () => {
+  const r = parseReceipt(
+    ocr(["SHOP", "2819.28 38.56", "SUBTOTAL 229.85", "XXLES XXX", "XXTAL 2819.28"]),
+  );
+  // Nothing printable sits in the subtotal window, so the amount stays — but
+  // it must be flagged for a human.
+  assert.ok(
+    r.flags.some((f) => f.code === "total_mismatch" && f.severity === "warn"),
+    JSON.stringify(r.flags),
+  );
+  assert.ok(forcesManualReview(r.flags));
+});
+
+test("clean receipts do not force manual review", () => {
+  const r = parseReceipt(
+    ocr(["BLUE BOTTLE COFFEE", "Date: 03/14/2026", "Subtotal 8.25", "Tax 0.74", "TOTAL 8.99"]),
+  );
+  assert.equal(forcesManualReview(r.flags), false, JSON.stringify(r.flags));
+});
+
+test("a comma-for-dot per-gallon price ($4,599) never flags the total", () => {
+  const r = parseReceipt(
+    ocr([
+      "MOBIL",
+      "DATE 12/27/22 6:38",
+      "GALLONS: 6.927",
+      "PRICE/G: $4,599",
+      "FUEL SALE $31.86",
+      "CREDIT $31.86",
+    ]),
+  );
+  assert.equal(r.amount.value, 31.86);
+  assert.ok(
+    !r.flags.some((f) => f.code === "total_mismatch"),
+    JSON.stringify(r.flags),
+  );
+  assert.equal(forcesManualReview(r.flags), false);
 });

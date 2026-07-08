@@ -40,7 +40,7 @@ test("longest alias wins over a generic word it contains", () => {
   // plain Amazon still resolves to the retail mapping.
   assert.equal(matchVendor("AMAZON.COM ORDER")?.name, "Amazon");
   // "uber eats" must beat "uber".
-  assert.equal(matchVendor("UBER EATS ORDER")?.category, "Meals & Entertainment");
+  assert.equal(matchVendor("UBER EATS ORDER")?.category, "Meals");
   assert.equal(matchVendor("UBER TRIP")?.category, "Ground Transportation");
 });
 
@@ -72,7 +72,7 @@ test("categorize prefers a known brand, else word-bounded keywords", () => {
   assert.deepEqual(categorize("Shell"), { category: "Fuel", matched: true });
   // generic keyword path for an unknown merchant.
   assert.deepEqual(categorize("Joe's Bistro", "fine dining"), {
-    category: "Meals & Entertainment",
+    category: "Meals",
     matched: true,
   });
   // "inn" must not fire inside "dinner" (word-bounded keyword).

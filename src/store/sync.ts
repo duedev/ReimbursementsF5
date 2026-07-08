@@ -188,7 +188,7 @@ class SyncEngine {
 
     // Upload referenced blobs not yet in storage.
     for (const r of receipts) {
-      for (const key of [r.fileKey, r.cleanedKey]) {
+      for (const key of [r.fileKey, r.cleanedKey, r.annotatedKey]) {
         if (!key || this.uploaded.has(key)) continue;
         const blob = await repo.getBlob(key);
         if (!blob) continue;
@@ -261,13 +261,15 @@ class SyncEngine {
 
   /** Download any storage blobs a merged receipt references but we don't hold. */
   private async ensureBlobs(c: SupabaseClient, r: Receipt): Promise<void> {
-    for (const key of [r.fileKey, r.cleanedKey]) {
+    for (const key of [r.fileKey, r.cleanedKey, r.annotatedKey]) {
       if (!key) continue;
       if (await repo.getBlob(key)) continue;
       const path = `${this.userId}/${key}`;
       const { data, error } = await c.storage.from(BLOB_BUCKET).download(path);
       if (!error && data) {
-        await repo.putBlob(data, key === r.fileKey ? "original" : "cleaned", key);
+        const kind =
+          key === r.fileKey ? "original" : key === r.cleanedKey ? "cleaned" : "annotated";
+        await repo.putBlob(data, kind, key);
         this.uploaded.add(key);
       }
     }
