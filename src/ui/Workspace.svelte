@@ -347,7 +347,7 @@
     padding: 0.4rem 0.55rem;
     border-radius: 8px;
     border: 1px solid var(--line-strong);
-    background: var(--raised);
+    background: var(--bg-raised);
     color: var(--ink);
     font: 500 0.85rem/1.2 var(--font-ui);
   }
@@ -361,7 +361,7 @@
     padding-bottom: 0.5rem;
   }
   .lane {
-    background: color-mix(in srgb, var(--raised) 70%, transparent);
+    background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
     border: 1px solid var(--line);
     border-radius: 12px;
     padding: 0.6rem;

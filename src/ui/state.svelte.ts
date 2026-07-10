@@ -158,6 +158,20 @@ class AppState {
     if (pref === "auto") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", pref);
     localStorage.setItem(THEME_KEY, pref);
+    // Browser/PWA chrome color follows the surface. index.html carries two
+    // media-scoped theme-color tags (values = each theme's --bg) that cover
+    // "auto"; an explicit choice must override both, since the media query
+    // tracks the OS, not data-theme.
+    const bg: Record<"light" | "dark", string> = {
+      light: "#f7f5f1",
+      dark: "#12100e",
+    };
+    for (const m of document.querySelectorAll<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    )) {
+      const scheme = m.media.includes("light") ? "light" : "dark";
+      m.content = bg[pref === "auto" ? scheme : pref];
+    }
   }
 
   toggleTheme(): void {

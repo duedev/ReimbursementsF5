@@ -1,0 +1,162 @@
+/* ============================================================================
+   Landing / marketing shared vocabulary.
+   Global on purpose (imported once by Landing.svelte): Svelte scoped styles
+   can't share keyframes or classes across the landing partials. Everything
+   here is namespaced under .landing or prefixed db- to stay collision-free.
+
+   Motion rule: every db-* animation a partial uses must ship an explicit
+   prefers-reduced-motion static end-state IN THAT PARTIAL — the global
+   kill-switch in theme.css truncates animations to 0.01ms, which freezes
+   reveal-type effects at their 0% (hidden) frame.
+   ========================================================================== */
+
+/* -- section rhythm shared by the orchestrator and all partials ------------ */
+.landing section {
+  padding: 3.6rem 0;
+}
+.landing section h2 {
+  font-size: clamp(1.7rem, 3.2vw, 2.3rem);
+  margin-bottom: 1.6rem;
+}
+
+/* -- "paper" mock surfaces (receipts, approved cards, mini sheets) ---------
+   Border-first elevation: hairline + the lightest shadow tier only. */
+.landing .paper {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-1);
+}
+
+/* -- planned-feature badge --------------------------------------------------
+   Neutral on purpose: gold text fails AA at this size in light mode, and
+   green would read "available". */
+.landing .badge-soon {
+  display: inline-flex;
+  align-items: center;
+  font: 600 0.72rem/1 var(--font-ui);
+  padding: 0.28rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--bg-sunken);
+  color: var(--ink-soft);
+  border: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+
+/* -- highlighter marks ------------------------------------------------------
+   The triad mirrors the on-image annotation colors baked by
+   pipeline/annotate.ts (blue vendor / green amount / red date); deliberately
+   hardcoded, not tokens — they are the product's own highlighter colors. */
+.landing .hl {
+  background: transparent;
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 0.14em;
+  box-decoration-break: clone;
+}
+.landing .hl-vendor {
+  background: color-mix(in srgb, #1d4ed8 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1d4ed8 45%, transparent);
+}
+.landing .hl-date {
+  background: color-mix(in srgb, #dc2626 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #dc2626 45%, transparent);
+}
+.landing .hl-amount {
+  background: color-mix(in srgb, #147246 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #147246 45%, transparent);
+}
+
+/* ============================================================================
+   Shared keyframes (global names). One unhurried 8s clock drives the hero
+   strip: the scan line sweeps first, each highlight appears only AFTER the
+   sweep passes it, then the approved card pops and the workbook cell flashes.
+   ========================================================================== */
+
+@keyframes db-scan {
+  0%,
+  100% {
+    transform: translateY(-10%);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(210%);
+    opacity: 0.9;
+  }
+  48% {
+    opacity: 0;
+  }
+  99% {
+    transform: translateY(210%);
+  }
+}
+
+/* Reveal points trail the scan band's position at the same cycle time. */
+@keyframes db-reveal-vendor {
+  0%, 8% { opacity: 0; }
+  12%, 96% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes db-reveal-amount {
+  0%, 32% { opacity: 0; }
+  36%, 96% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes db-reveal-date {
+  0%, 39% { opacity: 0; }
+  43%, 96% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Connector arrows nudge in turn as the story moves down the strip. */
+@keyframes db-nudge1 {
+  0%, 44%, 54%, 100% {
+    opacity: 0.45;
+    transform: none;
+  }
+  49% {
+    opacity: 1;
+    transform: translateY(3px);
+  }
+}
+@keyframes db-nudge2 {
+  0%, 58%, 68%, 100% {
+    opacity: 0.45;
+    transform: none;
+  }
+  63% {
+    opacity: 1;
+    transform: translateY(3px);
+  }
+}
+
+/* The "Approved ✓" chip pops once the fields are read. */
+@keyframes db-pop {
+  0%, 50% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.9);
+  }
+  56%, 96% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The workbook total re-foots. */
+@keyframes db-cell-flash {
+  0%, 64% {
+    background: transparent;
+  }
+  70%, 86% {
+    background: var(--accent-soft);
+  }
+  100% {
+    background: transparent;
+  }
+}

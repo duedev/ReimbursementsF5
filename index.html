@@ -6,15 +6,45 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5"
     />
-    <meta name="theme-color" content="#12100e" />
+    <!-- Browser chrome follows the theme: light paper / warm brown-black
+         (#12100e = dark --bg = the PWA manifest + icon color). An explicit
+         in-app theme choice overrides both via state.svelte.ts applyTheme. -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#f7f5f1"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#12100e"
+    />
     <meta
       name="description"
       content="Receipts in. Reimbursement report out. Snap or drop receipts, review them in seconds, download a polished Excel workbook. Free, on-device, no install."
     />
+    <meta
+      property="og:title"
+      content="DueBack — receipts in, reimbursement report out"
+    />
+    <meta
+      property="og:description"
+      content="Snap or drop receipts, review them in seconds, download a polished Excel workbook. Free, on-device, no install."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta
+      name="twitter:title"
+      content="DueBack — receipts in, reimbursement report out"
+    />
+    <meta
+      name="twitter:description"
+      content="Snap or drop receipts, review them in seconds, download a polished Excel workbook. Free, on-device, no install."
+    />
     <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Reimburse" />
+    <meta name="apple-mobile-web-app-title" content="DueBack" />
     <title>DueBack: receipts in, report out</title>
   </head>
   <body>

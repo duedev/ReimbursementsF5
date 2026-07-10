@@ -33,13 +33,13 @@
   --line: #e4dfd6;
   --line-strong: #cfc8bc;
 
-  --accent: #147246; /* primary actions — 5.3:1 on --bg */
+  --accent: #147246; /* primary actions — 5.5:1 on --bg */
   --accent-strong: #0c5433;
   --accent-ink: #ffffff; /* text on accent */
   --accent-soft: rgb(20 114 70 / 0.1);
   --accent-line: rgb(20 114 70 / 0.35);
 
-  --gold: #d9480f; /* highlights, "review" accents — vivid orange, 4.6:1 on --bg */
+  --gold: #d9480f; /* "review" accents — vivid orange. Only 4.0:1 on --bg: fills, large text and badges, never small copy */
   --gold-soft: rgb(217 72 15 / 0.12);
   --ok: #147246;
   --warn: #d9480f;
@@ -59,16 +59,19 @@
 }
 
 [data-theme="dark"] {
-  --bg: #0f1113;
-  --bg-raised: #191c1f;
-  --bg-sunken: #0a0b0d;
-  --ink: #edeff1;
-  --ink-soft: #a9b0b6;
-  --ink-faint: #7e858c;
-  --line: #262a2e;
-  --line-strong: #3b4147;
+  /* Warm brown-black ladder anchored on #12100e — the PWA theme-color and
+     app-icon chrome — so installed dark mode is seamless edge to edge.
+     Luminance-matched to the old cool ladder; every pair stays WCAG AA. */
+  --bg: #12100e;
+  --bg-raised: #1e1b17;
+  --bg-sunken: #0c0a08;
+  --ink: #f2efe9;
+  --ink-soft: #b4ada3;
+  --ink-faint: #8b8379;
+  --line: #2a251f;
+  --line-strong: #453e35;
 
-  --accent: #3ecf82; /* 8.6:1 on --bg */
+  --accent: #3ecf82; /* 9.4:1 on --bg */
   --accent-strong: #7fe6ab;
   --accent-ink: #0b2717;
   --accent-soft: rgb(62 207 130 / 0.13);
@@ -98,15 +101,16 @@
 
 /* System preference when the user hasn't chosen explicitly. */
 @media (prefers-color-scheme: dark) {
+  /* Keep identical to the [data-theme="dark"] block above. */
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --bg: #0f1113;
-    --bg-raised: #191c1f;
-    --bg-sunken: #0a0b0d;
-    --ink: #edeff1;
-    --ink-soft: #a9b0b6;
-    --ink-faint: #7e858c;
-    --line: #262a2e;
-    --line-strong: #3b4147;
+    --bg: #12100e;
+    --bg-raised: #1e1b17;
+    --bg-sunken: #0c0a08;
+    --ink: #f2efe9;
+    --ink-soft: #b4ada3;
+    --ink-faint: #8b8379;
+    --line: #2a251f;
+    --line-strong: #453e35;
 
     --accent: #3ecf82;
     --accent-strong: #7fe6ab;
