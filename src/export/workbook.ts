@@ -4,6 +4,7 @@ import { APP_NAME } from "../config/constants.ts";
 import { CATEGORIES, CATEGORY_META } from "../config/categories.ts";
 import { safeAmount } from "../util/money.ts";
 import { perDiemAmount, perDiemLabel } from "../util/perdiem.ts";
+import { phoneServiceAmount, phoneServiceLabel } from "../util/phone.ts";
 import { computeInsights, type Insights } from "./insights.ts";
 import { thumbnail } from "./images.ts";
 import {
@@ -165,11 +166,20 @@ function exportable(receipts: Receipt[]): Receipt[] {
     .sort((a, b) => (a.date.value < b.date.value ? -1 : 1));
 }
 
+export interface WorkbookOptions {
+  /** Add the Insights dashboard sheet (KPI tiles + charts). Off by default —
+   *  most offices want the form, and skipping it also skips the chart
+   *  rendering, the slowest part of a build. */
+  insights?: boolean;
+}
+
 export async function buildWorkbook(
   batch: Batch,
   receipts: Receipt[],
   getBlob: (key: string) => Promise<Blob | undefined>,
+  opts: WorkbookOptions = {},
 ): Promise<ExportResult> {
+  const withInsights = opts.insights === true;
   const rows = exportable(receipts);
   const wb = new ExcelJS.Workbook();
   wb.creator = APP_NAME;
@@ -199,14 +209,18 @@ export async function buildWorkbook(
 
   const totalCost = rows.reduce((s, r) => s + (r.cost || 0), 0);
   const currency = dominantCurrency(rows);
+  // Always computed — the Summary's info band uses insights.period — but the
+  // charts (the slow part) only render when the Insights sheet is wanted.
   const insights = computeInsights(rows);
-  const charts = {
-    category: await categoryChartImage(insights).catch(() => null),
-    daily: await dailyChartImage(insights).catch(() => null),
-    vendors: await vendorsChartImage(insights).catch(() => null),
-    cumulative: await cumulativeChartImage(insights).catch(() => null),
-    share: await shareChartImage(insights).catch(() => null),
-  };
+  const charts = withInsights
+    ? {
+        category: await categoryChartImage(insights).catch(() => null),
+        daily: await dailyChartImage(insights).catch(() => null),
+        vendors: await vendorsChartImage(insights).catch(() => null),
+        cumulative: await cumulativeChartImage(insights).catch(() => null),
+        share: await shareChartImage(insights).catch(() => null),
+      }
+    : { category: null, daily: null, vendors: null, cumulative: null, share: null };
 
   // Categories present, in taxonomy order; layout is computed up-front so the
   // Summary (built first, shown first) can hyperlink into the image sheets.
@@ -233,13 +247,15 @@ export async function buildWorkbook(
   }
 
   // Tab order: Summary first (it IS the per-category receipt table, linked),
-  // the category image sheets next (Fuel, Materials, … Miscellaneous), and
-  // Insights all the way to the right.
+  // the category image sheets next (Fuel, Materials, … Miscellaneous), and —
+  // when opted in — Insights all the way to the right.
   const refs = buildSummarySheet(wb, batch, perCategory, anchors, amountRefs, currency, insights);
   for (const g of perCategory) {
     buildImageSheet(wb, g.cat, g.rows, imageByReceipt, batch, currency);
   }
-  buildInsightsSheet(wb, batch, insights, currency, charts, refs);
+  if (withInsights) {
+    buildInsightsSheet(wb, batch, insights, currency, charts, refs);
+  }
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -498,40 +514,55 @@ function buildSummarySheet(
     r += 2; // spacer between sections
   }
 
-  // Per-diem line — a flat allowance with no receipts behind it, so it sits
-  // between the receipt sections and the TOTAL. It feeds the Summary TOTAL
-  // only; the Insights KPIs stay receipt analytics (adding it there would
-  // skew Avg/Receipt and Largest).
+  // Allowance lines — flat amounts with no receipts behind them (per diem,
+  // phone service), so they sit between the receipt sections and the TOTAL.
+  // They feed the Summary TOTAL only; the Insights KPIs stay receipt
+  // analytics (adding them there would skew Avg/Receipt and Largest).
+  const allowances: { label: string; amount: number }[] = [];
   const perDiem = perDiemAmount(batch.perDiem);
-  let perDiemCell: string | null = null;
   if (perDiem > 0) {
+    allowances.push({
+      label: `Per diem — ${perDiemLabel(batch.perDiem!, currency)}`,
+      amount: perDiem,
+    });
+  }
+  const phone = phoneServiceAmount(batch.phoneService);
+  if (phone > 0) {
+    allowances.push({
+      label: `Phone service — ${phoneServiceLabel(batch.phoneService!, currency)}`,
+      amount: phone,
+    });
+  }
+  const allowanceCells: string[] = [];
+  for (const a of allowances) {
     ws.mergeCells(r, 2, r, 5); // merged → skipped by autofit, long label safe
     const label = ws.getCell(r, 2);
-    label.value = `Per diem — ${perDiemLabel(batch.perDiem!, currency)}`;
+    label.value = a.label;
     label.font = { bold: true, color: { argb: "FF1F2937" } };
     label.alignment = { horizontal: "right", vertical: "middle" };
     const amt = ws.getCell(r, 6);
-    amt.value = perDiem;
+    amt.value = a.amount;
     amt.font = { bold: true, color: { argb: "FF1F2937" } };
     amt.numFmt = fmt;
     amt.alignment = { horizontal: "right", vertical: "middle" };
     for (let c = 2; c <= 6; c++) fill(ws.getCell(r, c), NOTE_YELLOW);
     ws.getRow(r).height = 20;
-    perDiemCell = `F${r}`;
-    r += 2;
+    allowanceCells.push(`F${r}`);
+    r++;
   }
+  if (allowances.length > 0) r++; // spacer before the TOTAL
 
-  // Grand TOTAL row footing the subtotals (+ the per-diem line, when present)
+  // Grand TOTAL row footing the subtotals (+ any allowance lines)
   const totalRow = ws.getRow(r);
   totalRow.getCell(5).value = "TOTAL";
   totalRow.getCell(6).value = {
-    formula:
-      [...subtotalCells, ...(perDiemCell ? [perDiemCell] : [])].join("+") || "0",
+    formula: [...subtotalCells, ...allowanceCells].join("+") || "0",
     result:
       perCategory.reduce(
         (s, g) => s + g.rows.reduce((x, rec) => x + safeAmount(rec.amount.value), 0),
         0,
-      ) + perDiem,
+      ) +
+      allowances.reduce((s, a) => s + a.amount, 0),
   };
   for (const c of [5, 6]) {
     const cell = totalRow.getCell(c);

@@ -54,7 +54,7 @@ const receipts: Receipt[] = [
 ];
 
 test("buildWorkbook produces a valid multi-sheet workbook with footing totals", async () => {
-  const result = await buildWorkbook(batch, receipts, async () => undefined);
+  const result = await buildWorkbook(batch, receipts, async () => undefined, { insights: true });
   assert.equal(result.count, 4);
   assert.equal(result.totalCost, 0);
   // The original app's convention: Reimbursements_{Employee}_{YYYYMMDD}.xlsx
@@ -137,7 +137,7 @@ test("buildWorkbook skips failed and zero-amount receipts", async () => {
 });
 
 test("sheet order: Summary, categories in taxonomy order, Insights rightmost", async () => {
-  const result = await buildWorkbook(batch, receipts, async () => undefined);
+  const result = await buildWorkbook(batch, receipts, async () => undefined, { insights: true });
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await result.blob.arrayBuffer());
   const names = wb.worksheets.map((w) => w.name);
@@ -146,6 +146,25 @@ test("sheet order: Summary, categories in taxonomy order, Insights rightmost", a
   // The Summary IS the receipt table (linked); no redundant flat copy.
   assert.ok(!names.includes("All Receipts"));
   assert.deepEqual(names.slice(1, -1), ["Meals", "Travel", "Lodging", "Ground Transportation"]);
+});
+
+test("the Insights sheet is opt-in — absent by default", async () => {
+  const result = await buildWorkbook(batch, receipts, async () => undefined);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await result.blob.arrayBuffer());
+  const names = wb.worksheets.map((w) => w.name);
+  assert.ok(!names.includes("Insights"), names.join(", "));
+  // Without it, the rightmost tab is the last category sheet…
+  assert.equal(names[names.length - 1], "Ground Transportation");
+  // …and the Summary still knows the expense period (computed regardless).
+  const summary = wb.getWorksheet("Summary")!;
+  let period = "";
+  summary.eachRow((row) => {
+    if (String(row.getCell(2).value ?? "") === "Expense Period:") {
+      period = String(row.getCell(3).value ?? "");
+    }
+  });
+  assert.match(period, /Jan/, `expense period present (got "${period}")`);
 });
 
 test('"Other" receipts are labeled Miscellaneous in the report', async () => {
@@ -195,7 +214,7 @@ test("no app-generated notes reach the report; credits sit at the top", async ()
 });
 
 test("Insights Total Spend foots from the Summary's subtotal formulas", async () => {
-  const result = await buildWorkbook(batch, receipts, async () => undefined);
+  const result = await buildWorkbook(batch, receipts, async () => undefined, { insights: true });
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await result.blob.arrayBuffer());
   const insights = wb.getWorksheet("Insights")!;
@@ -259,7 +278,7 @@ test("Summary amounts are live references to the category sheets", async () => {
 });
 
 test("Insights KPIs and tables derive from Summary cells", async () => {
-  const result = await buildWorkbook(batch, receipts, async () => undefined);
+  const result = await buildWorkbook(batch, receipts, async () => undefined, { insights: true });
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await result.blob.arrayBuffer());
   const ins = wb.getWorksheet("Insights")!;
@@ -326,12 +345,16 @@ const receiptsTotal = receipts.reduce((s, r) => s + r.amount.value, 0);
 function summaryScan(wb: ExcelJS.Workbook): {
   perDiemLabel: string | null;
   perDiemAmount: number | null;
+  phoneLabel: string | null;
+  phoneAmount: number | null;
   total: number | null;
   totalFormula: string;
 } {
   const summary = wb.getWorksheet("Summary")!;
   let perDiemLabel: string | null = null;
   let perDiemAmount: number | null = null;
+  let phoneLabel: string | null = null;
+  let phoneAmount: number | null = null;
   let total: number | null = null;
   let totalFormula = "";
   summary.eachRow((row) => {
@@ -340,13 +363,17 @@ function summaryScan(wb: ExcelJS.Workbook): {
       perDiemLabel = c2;
       perDiemAmount = Number(row.getCell(6).value);
     }
+    if (c2.startsWith("Phone service")) {
+      phoneLabel = c2;
+      phoneAmount = Number(row.getCell(6).value);
+    }
     if (String(row.getCell(5).value ?? "") === "TOTAL") {
       const cell = row.getCell(6).value as { formula?: string; result?: number } | number;
       total = typeof cell === "object" ? Number(cell?.result) : Number(cell);
       totalFormula = typeof cell === "object" ? (cell?.formula ?? "") : "";
     }
   });
-  return { perDiemLabel, perDiemAmount, total, totalFormula };
+  return { perDiemLabel, perDiemAmount, phoneLabel, phoneAmount, total, totalFormula };
 }
 
 test("per diem adds a labeled allowance line and feeds the TOTAL", async () => {
@@ -354,7 +381,7 @@ test("per diem adds a labeled allowance line and feeds the TOTAL", async () => {
     ...batch,
     perDiem: { enabled: true, rate: 75, days: 5 },
   };
-  const result = await buildWorkbook(pdBatch, receipts, async () => undefined);
+  const result = await buildWorkbook(pdBatch, receipts, async () => undefined, { insights: true });
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await result.blob.arrayBuffer());
   const scan = summaryScan(wb);
@@ -393,6 +420,56 @@ test("no per-diem line when disabled or zero", async () => {
     await wb.xlsx.load(await result.blob.arrayBuffer());
     const scan = summaryScan(wb);
     assert.equal(scan.perDiemLabel, null);
+    assert.ok(Math.abs(scan.total! - receiptsTotal) < 0.001);
+  }
+});
+
+test("phone service adds a month-listing line and feeds the TOTAL", async () => {
+  const psBatch: Batch = {
+    ...batch,
+    phoneService: { enabled: true, months: ["2026-01", "2026-02", "2026-04"] },
+  };
+  const result = await buildWorkbook(psBatch, receipts, async () => undefined);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await result.blob.arrayBuffer());
+  const scan = summaryScan(wb);
+  assert.equal(
+    scan.phoneLabel,
+    "Phone service — 3 months × $63.00/month (Jan–Feb 2026, Apr 2026)",
+  );
+  assert.equal(scan.phoneAmount, 189);
+  assert.ok(Math.abs(scan.total! - (receiptsTotal + 189)) < 0.001);
+  assert.equal(scan.perDiemLabel, null, "no per-diem row without per diem");
+});
+
+test("per diem and phone service stack as separate lines in one TOTAL", async () => {
+  const bothBatch: Batch = {
+    ...batch,
+    perDiem: { enabled: true, rate: 75, days: 5 },
+    phoneService: { enabled: true, months: ["2026-01", "2026-02"] },
+  };
+  const result = await buildWorkbook(bothBatch, receipts, async () => undefined);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await result.blob.arrayBuffer());
+  const scan = summaryScan(wb);
+  assert.equal(scan.perDiemAmount, 375);
+  assert.equal(scan.phoneAmount, 126);
+  assert.ok(Math.abs(scan.total! - (receiptsTotal + 375 + 126)) < 0.001);
+  // The TOTAL foots the subtotals plus BOTH allowance cells.
+  assert.match(scan.totalFormula, /\+F\d+\+F\d+$/);
+});
+
+test("no phone line when disabled or no months picked", async () => {
+  for (const phoneService of [
+    undefined,
+    { enabled: false, months: ["2026-01"] },
+    { enabled: true, months: [] },
+  ]) {
+    const result = await buildWorkbook({ ...batch, phoneService }, receipts, async () => undefined);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await result.blob.arrayBuffer());
+    const scan = summaryScan(wb);
+    assert.equal(scan.phoneLabel, null);
     assert.ok(Math.abs(scan.total! - receiptsTotal) < 0.001);
   }
 });

@@ -3,20 +3,35 @@
   import { repo } from "../store/repo.ts";
   import { formatMoney, safeAmount } from "../util/money.ts";
   import { perDiemAmount, safePerDiemDays } from "../util/perdiem.ts";
+  import { formatMonthList, normalizeMonths, phoneServiceAmount } from "../util/phone.ts";
+  import { PHONE_SERVICE_MONTHLY_USD } from "../config/constants.ts";
+  import {
+    findByName,
+    findByNumber,
+    listSavedJobs,
+    pairSaved,
+    saveJobPair,
+    type SavedJob,
+  } from "../store/jobs.ts";
   import { oneDriveConfigured } from "../onedrive/store.ts";
   import { ensureConnected, uploadReport } from "../onedrive/index.ts";
-  import type { PerDiem } from "../types.ts";
+  import type { PerDiem, PhoneService } from "../types.ts";
 
   // The output is the point: batch meta + one-click themed workbook / CSV.
 
   let employee = $state("");
   let jobName = $state("");
   let jobNumber = $state("");
-  // Per-diem option: a flat daily allowance added to the report on top of
-  // the receipts. Values persist on the batch even while toggled off.
+  // Allowance options: flat amounts added to the report on top of the
+  // receipts. Values persist on the batch even while toggled off.
   let pdEnabled = $state(false);
   let pdRate = $state<number | undefined>(undefined);
   let pdDays = $state<number | undefined>(undefined);
+  // Phone service: fixed monthly rate × the months picked below.
+  let phEnabled = $state(false);
+  let phMonths = $state<string[]>([]);
+  /** Year shown by the month picker — step freely, any year works. */
+  let phYear = $state(new Date().getFullYear());
   let seededBatch: string | null = null;
   let building = $state(false);
 
@@ -30,6 +45,9 @@
     pdEnabled = b.perDiem?.enabled ?? false;
     pdRate = b.perDiem?.rate || undefined;
     pdDays = b.perDiem?.days || undefined;
+    phEnabled = b.phoneService?.enabled ?? false;
+    phMonths = normalizeMonths(b.phoneService?.months);
+    if (phMonths.length) phYear = Number(phMonths[phMonths.length - 1]!.slice(0, 4));
   });
 
   /** Plain object (no $state proxies) — safe for the IndexedDB write. */
@@ -41,6 +59,11 @@
     };
   }
 
+  /** Same rule: fresh array of primitives, nothing reactive leaks through. */
+  function currentPhoneService(): PhoneService {
+    return { enabled: phEnabled, months: normalizeMonths(phMonths) };
+  }
+
   async function saveMeta(): Promise<void> {
     if (!app.batch) return;
     await repo.updateBatch(app.batch.id, {
@@ -48,7 +71,61 @@
       jobName,
       jobNumber,
       perDiem: currentPerDiem(),
+      phoneService: currentPhoneService(),
     });
+  }
+
+  // ---- Saved jobs: name ⇄ number always travel as a pair ------------------
+  let jobs = $state<SavedJob[]>([]);
+  void listSavedJobs().then((j) => (jobs = j));
+
+  /** Typing/picking a saved job name fills its number, and vice versa. */
+  function onJobName(): void {
+    const hit = findByName(jobs, jobName);
+    if (hit) jobNumber = hit.number;
+  }
+  function onJobNumber(): void {
+    const hit = findByNumber(jobs, jobNumber);
+    if (hit) jobName = hit.name;
+  }
+
+  const jobPairSaved = $derived(pairSaved(jobs, jobName, jobNumber));
+  const canSaveJob = $derived(
+    jobName.trim().length > 0 && jobNumber.trim().length > 0 && !jobPairSaved,
+  );
+
+  async function saveCurrentJob(): Promise<void> {
+    jobs = await saveJobPair(jobName, jobNumber);
+    app.toast(`Saved job "${jobName.trim()}" — it will autofill from now on.`, "ok");
+  }
+
+  // ---- Month picker (phone service) ----------------------------------------
+  const MONTH_ABBR = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+
+  function onPhoneToggle(): void {
+    // Reopen the picker where the user left off.
+    if (phEnabled && phMonths.length) {
+      phYear = Number(phMonths[phMonths.length - 1]!.slice(0, 4));
+    }
+    void saveMeta();
+  }
+
+  function toggleMonth(m: string): void {
+    phMonths = phMonths.includes(m)
+      ? phMonths.filter((x) => x !== m)
+      : [...phMonths, m].sort();
+    void saveMeta();
+  }
+
+  // ---- Insights sheet (opt-in, remembered across batches) ------------------
+  const INSIGHTS_KEY = "report.insights";
+  let includeInsights = $state(false);
+  void repo.getSetting<boolean>(INSIGHTS_KEY).then((v) => (includeInsights = v === true));
+  function saveInsightsPref(): void {
+    void repo.setSetting(INSIGHTS_KEY, includeInsights);
   }
 
   const exportable = $derived(
@@ -63,8 +140,11 @@
     exportable.reduce((s, r) => s + safeAmount(r.amount.value), 0),
   );
   const pdAmount = $derived(perDiemAmount(currentPerDiem()));
-  /** A per-diem-only report (no receipts) is still a real reimbursement. */
-  const nothingToExport = $derived(exportable.length === 0 && pdAmount === 0);
+  const phAmount = $derived(phoneServiceAmount(currentPhoneService()));
+  /** An allowances-only report (no receipts) is still a real reimbursement. */
+  const nothingToExport = $derived(
+    exportable.length === 0 && pdAmount === 0 && phAmount === 0,
+  );
 
   let zipping = $state(false);
 
@@ -123,7 +203,9 @@
     await saveMeta();
     const { buildWorkbook } = await import("../export/workbook.ts");
     const batch = (await repo.getBatch(app.batch!.id)) ?? app.batch!;
-    return buildWorkbook(batch, app.receipts, (k) => repo.getBlob(k));
+    return buildWorkbook(batch, app.receipts, (k) => repo.getBlob(k), {
+      insights: includeInsights,
+    });
   }
 
   async function generate(): Promise<void> {
@@ -189,61 +271,160 @@
     </div>
     <div class="f">
       <label for="xb-job">Job name</label>
-      <input id="xb-job" type="text" bind:value={jobName} onchange={saveMeta} placeholder="Project / trip" />
+      <input
+        id="xb-job"
+        type="text"
+        list="xb-job-names"
+        bind:value={jobName}
+        oninput={onJobName}
+        onchange={saveMeta}
+        placeholder="Project / trip"
+      />
     </div>
     <div class="f">
       <label for="xb-num">Job number</label>
-      <input id="xb-num" type="text" bind:value={jobNumber} onchange={saveMeta} placeholder="Optional" />
+      <input
+        id="xb-num"
+        type="text"
+        list="xb-job-numbers"
+        bind:value={jobNumber}
+        oninput={onJobNumber}
+        onchange={saveMeta}
+        placeholder="Optional"
+      />
     </div>
+    <div class="jobsave">
+      {#if canSaveJob}
+        <button
+          class="btn btn-ghost btn-sm"
+          onclick={() => void saveCurrentJob()}
+          title="Remember this job name + number pair; either one autofills the other"
+        >
+          ☆ Save job
+        </button>
+      {:else if jobPairSaved}
+        <span class="chip" title="This pair autofills — either field completes the other">★ saved job</span>
+      {/if}
+    </div>
+    <datalist id="xb-job-names">
+      {#each jobs as j (j.name)}<option value={j.name}></option>{/each}
+    </datalist>
+    <datalist id="xb-job-numbers">
+      {#each jobs as j (j.name)}<option value={j.number}>{j.name}</option>{/each}
+    </datalist>
   </div>
 
-  <div class="perdiem">
-    <label class="check">
-      <input type="checkbox" bind:checked={pdEnabled} onchange={saveMeta} />
-      <span>Per diem</span>
-    </label>
-    {#if pdEnabled}
-      <div class="f pd-f">
-        <label for="xb-pd-rate">$ per day</label>
-        <input
-          id="xb-pd-rate"
-          type="number"
-          min="0"
-          step="0.01"
-          inputmode="decimal"
-          placeholder="75.00"
-          bind:value={pdRate}
-          onchange={saveMeta}
-        />
-      </div>
-      <div class="f pd-f">
-        <label for="xb-pd-days">Days</label>
-        <input
-          id="xb-pd-days"
-          type="number"
-          min="0"
-          step="1"
-          inputmode="decimal"
-          placeholder="5"
-          bind:value={pdDays}
-          onchange={saveMeta}
-        />
-      </div>
-      <span class="pd-total muted" aria-live="polite">
-        = {formatMoney(pdAmount)} added to the report
+  <div class="opts">
+    <div class="opt" class:open={pdEnabled}>
+      <label class="check">
+        <input type="checkbox" bind:checked={pdEnabled} onchange={saveMeta} />
+        <span>Per diem</span>
+      </label>
+      {#if pdEnabled}
+        <div class="pd-grid">
+          <div class="f">
+            <label for="xb-pd-rate">$ per day</label>
+            <input
+              id="xb-pd-rate"
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              placeholder="75.00"
+              bind:value={pdRate}
+              onchange={saveMeta}
+            />
+          </div>
+          <div class="f">
+            <label for="xb-pd-days">Days</label>
+            <input
+              id="xb-pd-days"
+              type="number"
+              min="0"
+              step="1"
+              inputmode="decimal"
+              placeholder="5"
+              bind:value={pdDays}
+              onchange={saveMeta}
+            />
+          </div>
+        </div>
+        <span class="opt-total muted small" aria-live="polite">
+          = {formatMoney(pdAmount)} added to the report
+        </span>
+      {:else}
+        <span class="muted small">A flat daily allowance on top of the receipts.</span>
+      {/if}
+    </div>
+
+    <div class="opt" class:open={phEnabled}>
+      <label class="check">
+        <input type="checkbox" bind:checked={phEnabled} onchange={onPhoneToggle} />
+        <span>Phone service</span>
+      </label>
+      {#if phEnabled}
+        <div class="ph-year">
+          <button
+            type="button"
+            class="yr-btn"
+            onclick={() => (phYear = phYear - 1)}
+            aria-label="Previous year"
+          >‹</button>
+          <strong class="yr-label">{phYear}</strong>
+          <button
+            type="button"
+            class="yr-btn"
+            onclick={() => (phYear = phYear + 1)}
+            aria-label="Next year"
+          >›</button>
+        </div>
+        <div class="ph-months" role="group" aria-label="Months to reimburse">
+          {#each MONTH_ABBR as name, i (name)}
+            {@const key = `${phYear}-${String(i + 1).padStart(2, "0")}`}
+            <button
+              type="button"
+              class="month-chip"
+              class:on={phMonths.includes(key)}
+              aria-pressed={phMonths.includes(key)}
+              aria-label={`${name} ${phYear}`}
+              onclick={() => toggleMonth(key)}
+            >
+              {name}
+            </button>
+          {/each}
+        </div>
+        <span class="opt-total muted small" aria-live="polite">
+          {#if phMonths.length}
+            {formatMonthList(phMonths)} — <strong>{formatMoney(phAmount)}</strong>
+          {:else}
+            Pick any months, any year ({formatMoney(PHONE_SERVICE_MONTHLY_USD)} each).
+          {/if}
+        </span>
+      {:else}
+        <span class="muted small">
+          Fixed {formatMoney(PHONE_SERVICE_MONTHLY_USD)}/month, for the months you pick.
+        </span>
+      {/if}
+    </div>
+
+    <div class="opt" class:open={includeInsights}>
+      <label class="check">
+        <input type="checkbox" bind:checked={includeInsights} onchange={saveInsightsPref} />
+        <span>Insights sheet</span>
+      </label>
+      <span class="muted small">
+        Adds a KPI + charts dashboard tab to the workbook.
       </span>
-    {:else}
-      <span class="muted small">Add a flat daily allowance to the report.</span>
-    {/if}
+    </div>
   </div>
 
   <div class="actions">
     <div class="sum">
-      <strong class="sum-total">{formatMoney(totalAmount + pdAmount)}</strong>
+      <strong class="sum-total">{formatMoney(totalAmount + pdAmount + phAmount)}</strong>
       <span class="muted">
         {exportable.length} of {app.receipts.length} receipts{pdAmount > 0
           ? " + per diem"
-          : ""}
+          : ""}{phAmount > 0 ? " + phone" : ""}
       </span>
     </div>
     {#if flagged.length > 0}
@@ -292,12 +473,32 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 0.8rem;
+    align-items: end;
   }
-  .perdiem {
+  .jobsave {
     display: flex;
     align-items: center;
-    gap: 0.9rem;
-    flex-wrap: wrap;
+    min-height: 2.2rem;
+  }
+
+  /* ---- report options: three self-contained cards ---- */
+  .opts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0.8rem;
+    align-items: stretch;
+  }
+  .opt {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+    display: grid;
+    gap: 0.55rem;
+    align-content: start;
+  }
+  .opt.open {
+    border-color: var(--line-strong);
+    background: color-mix(in srgb, var(--bg-raised) 60%, transparent);
   }
   .check {
     display: inline-flex;
@@ -311,16 +512,55 @@
     width: auto;
     accent-color: var(--accent);
   }
-  .pd-f {
+  .pd-grid {
     display: grid;
-    gap: 0.25rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
   }
-  .pd-f input {
-    max-width: 8.5rem;
-  }
-  .pd-total {
+  .opt-total {
     font-variant-numeric: tabular-nums;
   }
+
+  /* ---- phone-service month picker: ‹ year › + 12 chips ---- */
+  .ph-year {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .yr-btn {
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: var(--bg-raised);
+    color: var(--ink);
+    font: 700 0.95rem/1 var(--font-ui);
+    width: 1.7rem;
+    height: 1.7rem;
+    cursor: pointer;
+  }
+  .yr-label {
+    font: 650 0.95rem/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+  .ph-months {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.35rem;
+  }
+  .month-chip {
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--bg-raised);
+    color: var(--ink-soft);
+    font: 600 0.78rem/1 var(--font-ui);
+    padding: 0.4rem 0;
+    cursor: pointer;
+  }
+  .month-chip.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+
   .small {
     font-size: 0.84rem;
   }
